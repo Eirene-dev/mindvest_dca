@@ -42,6 +42,8 @@ from adaptive.policies import (
     get_state_params,   # 선택: 사용하면 더 안전
     get_adjustments,    # 선택: 필요시 사용
 )
+from adaptive.positions import PosInfo, PositionState
+from adaptive.exchange import OrderManager, BinanceTrader
 
 
 # ==========================================
@@ -54,6 +56,8 @@ CHAT_ID = int(os.getenv('CHAT_ID', '122'))
 
 API_KEY = os.getenv('BINANCE_API_KEY', 'xxx')
 API_SEC = os.getenv('BINANCE_API_SECRET', 'xxx')
+BinanceTrader.init(API_KEY, API_SEC)
+OrderManager.init(API_KEY, API_SEC)
 
 # Portfolio Settings
 TOTAL_PORTFOLIO_LIMIT = float(os.getenv('TOTAL_PORTFOLIO_LIMIT', '100000'))  # 전체 포트폴리오 한도
@@ -315,410 +319,421 @@ class TradeConfig:
 if len(sys.argv) > 1:
     TradeConfig.loads()
 
-def reconnect():
-    return ccxt.binance(config={
-        'apiKey': TradeConfig.binance_api_key,
-        'secret': TradeConfig.binance_api_sec,
-        'enableRateLimit': True,
-        'options': {'defaultType': 'future'}
-    })
+# def reconnect():
+#     return ccxt.binance(config={
+#         'apiKey': TradeConfig.binance_api_key,
+#         'secret': TradeConfig.binance_api_sec,
+#         'enableRateLimit': True,
+#         'options': {'defaultType': 'future'}
+#     })
 
-class OrderManager:
-    broker = reconnect()
+# class OrderManager:
+#     broker = reconnect()
 
-    @classmethod
-    def reconnect(cls):
-        cls.broker = reconnect()
+#     @classmethod
+#     def reconnect(cls):
+#         cls.broker = reconnect()
 
-    @classmethod
-    def buy_market(cls, symbol_config, request_price, vol):
-        if symbol_config.direction == 'LONG':
-            BinanceTrader.open_long(symbol_config, request_price, vol, False)
-        elif symbol_config.direction == 'SHORT':
-            BinanceTrader.open_short(symbol_config, request_price, vol, False)
+#     @classmethod
+#     def buy_market(cls, symbol_config, request_price, vol):
+#         if symbol_config.direction == 'LONG':
+#             BinanceTrader.open_long(symbol_config, request_price, vol, False)
+#         elif symbol_config.direction == 'SHORT':
+#             BinanceTrader.open_short(symbol_config, request_price, vol, False)
 
-    @classmethod
-    def sell_market(cls, symbol_config, request_price, vol):
-        if symbol_config.direction == 'LONG':
-            BinanceTrader.close_long(symbol_config, request_price, vol, False)
-        elif symbol_config.direction == 'SHORT':
-            BinanceTrader.close_short(symbol_config, request_price, vol, False)
+#     @classmethod
+#     def sell_market(cls, symbol_config, request_price, vol):
+#         if symbol_config.direction == 'LONG':
+#             BinanceTrader.close_long(symbol_config, request_price, vol, False)
+#         elif symbol_config.direction == 'SHORT':
+#             BinanceTrader.close_short(symbol_config, request_price, vol, False)
 
-class BinanceTrader:
-    client = Client(api_key=TradeConfig.binance_api_key, api_secret=TradeConfig.binance_api_sec)
+# class BinanceTrader:
+#     client = Client(api_key=TradeConfig.binance_api_key, api_secret=TradeConfig.binance_api_sec)
 
-    @classmethod
-    def reconnect(cls):
-        cls.client = Client(api_key=TradeConfig.binance_api_key, api_secret=TradeConfig.binance_api_sec)
+#     @classmethod
+#     def reconnect(cls):
+#         cls.client = Client(api_key=TradeConfig.binance_api_key, api_secret=TradeConfig.binance_api_sec)
 
-    @classmethod
-    def open_long(cls, symbol_config, price, quantity, is_limit):
-        cls.create_order(symbol_config, price, 'BUY', 'LONG', quantity, is_limit)
+#     @classmethod
+#     def open_long(cls, symbol_config, price, quantity, is_limit):
+#         cls.create_order(symbol_config, price, 'BUY', 'LONG', quantity, is_limit)
 
-    @classmethod
-    def close_long(cls, symbol_config, price, quantity, is_limit):
-        cls.create_order(symbol_config, price, 'SELL', 'LONG', quantity, is_limit)
+#     @classmethod
+#     def close_long(cls, symbol_config, price, quantity, is_limit):
+#         cls.create_order(symbol_config, price, 'SELL', 'LONG', quantity, is_limit)
 
-    @classmethod
-    def open_short(cls, symbol_config, price, quantity, is_limit):
-        cls.create_order(symbol_config, price, 'SELL', 'SHORT', quantity, is_limit)
+#     @classmethod
+#     def open_short(cls, symbol_config, price, quantity, is_limit):
+#         cls.create_order(symbol_config, price, 'SELL', 'SHORT', quantity, is_limit)
 
-    @classmethod
-    def close_short(cls, symbol_config, price, quantity, is_limit):
-        cls.create_order(symbol_config, price, 'BUY', 'SHORT', quantity, is_limit)
+#     @classmethod
+#     def close_short(cls, symbol_config, price, quantity, is_limit):
+#         cls.create_order(symbol_config, price, 'BUY', 'SHORT', quantity, is_limit)
 
-    @classmethod
-    def create_order(cls, symbol_config, price, side, position_side, quantity, is_limit):
-        price = round(price, symbol_config.price_precision)
-        try:
-            if is_limit:
-                order = cls.client.futures_create_order(
-                    symbol=symbol_config.symbol_binance,
-                    type='LIMIT',
-                    timeInForce='GTC',
-                    price=price,
-                    side=side,
-                    positionSide=position_side,
-                    quantity=quantity
-                )
-            else:
-                order = cls.client.futures_create_order(
-                    symbol=symbol_config.symbol_binance,
-                    type='MARKET',
-                    side=side,
-                    positionSide=position_side,
-                    quantity=quantity
-                )
-            logger.info(order)
-        except Exception as e:
-            logger.error('{} {} {} {} {}'.format(symbol_config.symbol, price, position_side, quantity, str(e)))
+#     @classmethod
+#     def create_order(cls, symbol_config, price, side, position_side, quantity, is_limit):
+#         price = round(price, symbol_config.price_precision)
+#         try:
+#             if is_limit:
+#                 order = cls.client.futures_create_order(
+#                     symbol=symbol_config.symbol_binance,
+#                     type='LIMIT',
+#                     timeInForce='GTC',
+#                     price=price,
+#                     side=side,
+#                     positionSide=position_side,
+#                     quantity=quantity
+#                 )
+#             else:
+#                 order = cls.client.futures_create_order(
+#                     symbol=symbol_config.symbol_binance,
+#                     type='MARKET',
+#                     side=side,
+#                     positionSide=position_side,
+#                     quantity=quantity
+#                 )
+#             logger.info(order)
+#         except Exception as e:
+#             logger.error('{} {} {} {} {}'.format(symbol_config.symbol, price, position_side, quantity, str(e)))
 
-class PositionState(Enum):
-    NoPos = 0
-    HavePos = 1
-    MaxPos = 2
+# class PositionState(Enum):
+#     NoPos = 0
+#     HavePos = 1
+#     MaxPos = 2
 
-class PosInfo:
-    def __init__(self, symbol_config):
-        self.symbol_config = symbol_config
-        self.last_update_time = time.time() - 3600
-        self.position_amt = {'LONG':0, 'SHORT':0}
-        self.entry_price = {'LONG':0.0, 'SHORT':100000.0}
-        self.pos_state = {'LONG':PositionState.NoPos, 'SHORT':PositionState.NoPos}
+# class PosInfo:
+#     def __init__(self, symbol_config):
+#         self.symbol_config = symbol_config
+#         self.last_update_time = time.time() - 3600
+#         self.position_amt = {'LONG':0, 'SHORT':0}
+#         self.entry_price = {'LONG':0.0, 'SHORT':100000.0}
+#         self.pos_state = {'LONG':PositionState.NoPos, 'SHORT':PositionState.NoPos}
         
-        try:
-            ticker = BinanceTrader.client.futures_symbol_ticker(symbol=symbol_config.symbol_binance)
-            self.price = float(ticker['price'])
-        except:
-            self.price = 0
+#         try:
+#             ticker = BinanceTrader.client.futures_symbol_ticker(symbol=symbol_config.symbol_binance)
+#             self.price = float(ticker['price'])
+#         except:
+#             self.price = 0
             
-        self.open_price = self.price
-        self.close_price = self.price
-        self.leftover = 0
-        self.va_target_amount = symbol_config.open_amount
+#         self.open_price = self.price
+#         self.close_price = self.price
+#         self.leftover = 0
+#         self.va_target_amount = symbol_config.open_amount
 
-        # 초기 히스토리컬 데이터 로드
-        self.load_initial_history()
+#         # 초기 히스토리컬 데이터 로드
+#         self.load_initial_history()
 
-    def load_initial_history(self):
-        """다층 시간대 히스토리컬 데이터 로드"""
-        try:
-            # 1. 장기 트렌드 (1D - 200일)
-            daily_klines = BinanceTrader.client.futures_klines(
-                symbol=self.symbol_config.symbol_binance,
-                interval='1d',
-                limit=200
-            )
+#     def load_initial_history(self):
+#         """다층 시간대 히스토리컬 데이터 로드"""
+#         try:
+#             # 1. 장기 트렌드 (1D - 200일)
+#             daily_klines = BinanceTrader.client.futures_klines(
+#                 symbol=self.symbol_config.symbol_binance,
+#                 interval='1d',
+#                 limit=200
+#             )
             
-            # 2. 중기 패턴 (4H - 최근 30일)
-            four_hour_klines = BinanceTrader.client.futures_klines(
-                symbol=self.symbol_config.symbol_binance,
-                interval='4h',
-                limit=180  # 30일
-            )
+#             # 2. 중기 패턴 (4H - 최근 30일)
+#             four_hour_klines = BinanceTrader.client.futures_klines(
+#                 symbol=self.symbol_config.symbol_binance,
+#                 interval='4h',
+#                 limit=180  # 30일
+#             )
             
-            # 3. 단기 정밀도 (1H - 최근 7일)
-            hourly_klines = BinanceTrader.client.futures_klines(
-                symbol=self.symbol_config.symbol_binance,
-                interval='1h',
-                limit=168  # 7일
-            )
+#             # 3. 단기 정밀도 (1H - 최근 7일)
+#             hourly_klines = BinanceTrader.client.futures_klines(
+#                 symbol=self.symbol_config.symbol_binance,
+#                 interval='1h',
+#                 limit=168  # 7일
+#             )
             
-            # 데이터 통합 (오래된 것부터)
-            processed_data = []
+#             # 데이터 통합 (오래된 것부터)
+#             processed_data = []
             
-            # 일봉 데이터 (200일 전 ~ 7일 전)
-            for kline in daily_klines[:-7]:
-                processed_data.append({
-                    'price': float(kline[4]),
-                    'volume': float(kline[7]),
-                    'weight': 0.5  # 오래된 데이터는 낮은 가중치
-                })
+#             # 일봉 데이터 (200일 전 ~ 7일 전)
+#             for kline in daily_klines[:-7]:
+#                 processed_data.append({
+#                     'price': float(kline[4]),
+#                     'volume': float(kline[7]),
+#                     'weight': 0.5  # 오래된 데이터는 낮은 가중치
+#                 })
             
-            # 4시간봉 데이터 (최근 30일)
-            for kline in four_hour_klines[-42:]:  # 최근 7일분
-                processed_data.append({
-                    'price': float(kline[4]),
-                    'volume': float(kline[7]),
-                    'weight': 0.8
-                })
+#             # 4시간봉 데이터 (최근 30일)
+#             for kline in four_hour_klines[-42:]:  # 최근 7일분
+#                 processed_data.append({
+#                     'price': float(kline[4]),
+#                     'volume': float(kline[7]),
+#                     'weight': 0.8
+#                 })
             
-            # 1시간봉 데이터 (최근 7일)
-            for kline in hourly_klines:
-                processed_data.append({
-                    'price': float(kline[4]),
-                    'volume': float(kline[7]),
-                    'weight': 1.0  # 최신 데이터는 높은 가중치
-                })
+#             # 1시간봉 데이터 (최근 7일)
+#             for kline in hourly_klines:
+#                 processed_data.append({
+#                     'price': float(kline[4]),
+#                     'volume': float(kline[7]),
+#                     'weight': 1.0  # 최신 데이터는 높은 가중치
+#                 })
             
-            # Position Analyzer에 로드
-            for data in processed_data:
-                position_analyzer.update_history(
-                    self.symbol_config.symbol,
-                    data['price'],
-                    data['volume']
-                )
+#             # Position Analyzer에 로드
+#             for data in processed_data:
+#                 position_analyzer.update_history(
+#                     self.symbol_config.symbol,
+#                     data['price'],
+#                     data['volume']
+#                 )
             
-            logger.info(f"Loaded {len(processed_data)} data points for {self.symbol_config.symbol}")
+#             logger.info(f"Loaded {len(processed_data)} data points for {self.symbol_config.symbol}")
             
-        except Exception as e:
-            logger.error(f"Failed to load historical data: {e}")
+#         except Exception as e:
+#             logger.error(f"Failed to load historical data: {e}")
 
-    def current_price(self):
-        try:
-            info = OrderManager.broker.fetch_ticker(self.symbol_config.symbol_binance)
-            price = float(info['last'])
-            self.price = price
+#     def current_price(self):
+#         try:
+#             info = OrderManager.broker.fetch_ticker(self.symbol_config.symbol_binance)
+#             price = float(info['last'])
+#             self.price = price
             
-            # Position Analyzer에 가격 업데이트
-            volume = float(info.get('quoteVolume', 0))
-            position_analyzer.update_history(self.symbol_config.symbol, price, volume)
+#             # Position Analyzer에 가격 업데이트
+#             volume = float(info.get('quoteVolume', 0))
+#             position_analyzer.update_history(self.symbol_config.symbol, price, volume)
             
-        except Exception:
-            price = self.price
-            OrderManager.reconnect()
-        return price
+#         except Exception:
+#             price = self.price
+#             OrderManager.reconnect()
+#         return price
 
-    def update(self, client):
-        try:
-            info = client.futures_position_information(symbol=self.symbol_config.symbol_binance)
-            for item in info:
-                if item['positionSide'] == 'BOTH':
-                    continue
-                self.position_amt[item['positionSide']] = abs(float(item['positionAmt']))
-                self.entry_price[item['positionSide']] = float(item['entryPrice'])
-        except Exception as e:
-            logger.error(e)
-            BinanceTrader.reconnect()
+#     def update(self, client):
+#         try:
+#             info = client.futures_position_information(symbol=self.symbol_config.symbol_binance)
+#             for item in info:
+#                 if item['positionSide'] == 'BOTH':
+#                     continue
+#                 self.position_amt[item['positionSide']] = abs(float(item['positionAmt']))
+#                 self.entry_price[item['positionSide']] = float(item['entryPrice'])
+#         except Exception as e:
+#             logger.error(e)
+#             BinanceTrader.reconnect()
 
-    async def trade(self):
-        """적응형 트레이드 (전략은 YAML 설정 따름)"""
-        state_params = state_manager.get_strategy_params()
+#     async def trade(self):
+#         """적응형 트레이드 (전략은 YAML 설정 따름)"""
+#         state_params = state_manager.get_strategy_params()
         
-        # 자산 위치 분석
-        position_score = position_analyzer.get_position_score(self.symbol_config.symbol)
+#         # 자산 위치 분석
+#         position_score = position_analyzer.get_position_score(self.symbol_config.symbol)
         
-        # 시장 상태와 자산 위치 모두 고려하여 파라미터 조정
-        if not self.symbol_config.apply_market_state_and_position(state_params, position_score):
-            logger.info(f"[{self.symbol_config.symbol}] Trading disabled")
-            return
+#         # 시장 상태와 자산 위치 모두 고려하여 파라미터 조정
+#         if not self.symbol_config.apply_market_state_and_position(state_params, position_score):
+#             logger.info(f"[{self.symbol_config.symbol}] Trading disabled")
+#             return
         
-        # 전략 선택은 YAML의 is_va 설정을 따름
-        if self.symbol_config.is_va:
-            await self.trade_va()
-        else:
-            await self.trade_dca()
+#         # 전략 선택은 YAML의 is_va 설정을 따름
+#         if self.symbol_config.is_va:
+#             await self.trade_va()
+#         else:
+#             await self.trade_dca()
 
-    async def trade_dca(self):
-        """DCA 전략 실행"""
-        if self.symbol_config.direction == 'LONG':
-            await self.trade_long()
-        elif self.symbol_config.direction == 'SHORT':
-            await self.trade_short()
+#     async def trade_dca(self):
+#         """DCA 전략 실행"""
+#         if self.symbol_config.direction == 'LONG':
+#             await self.trade_long()
+#         elif self.symbol_config.direction == 'SHORT':
+#             await self.trade_short()
 
-    async def trade_long(self):
-        """DCA Long 트레이딩"""
-        price = self.current_price()
-        entry_price = self.entry_price['LONG']
-        pos = self.position_amt['LONG']
+#     async def trade_long(self):
+#         """DCA Long 트레이딩"""
+#         price = self.current_price()
+#         entry_price = self.entry_price['LONG']
+#         pos = self.position_amt['LONG']
         
-        profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
-        tp_ratio = self.symbol_config.take_profit_ratio
-        sl_ratio = self.symbol_config.stop_loss_ratio
-        total_buy_amount = pos * entry_price + self.symbol_config.open_amount if entry_price > 0 else self.symbol_config.open_amount
-        max_amount = self.symbol_config.max_amount
+#         profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
+#         tp_ratio = self.symbol_config.take_profit_ratio
+#         sl_ratio = self.symbol_config.stop_loss_ratio
+#         total_buy_amount = pos * entry_price + self.symbol_config.open_amount if entry_price > 0 else self.symbol_config.open_amount
+#         max_amount = self.symbol_config.max_amount
 
-        print('{} {} Profit: {:0,.2f}%, Target: {:0,.2f}%'.format(
-            str(datetime.now()), self.symbol_config.symbol, profit_ratio, tp_ratio))
+#         print('{} {} Profit: {:0,.2f}%, Target: {:0,.2f}%'.format(
+#             str(datetime.now()), self.symbol_config.symbol, profit_ratio, tp_ratio))
 
-        # 익절
-        if pos > 0 and profit_ratio >= tp_ratio:
-            pos_to_sell = pos
-            if self.symbol_config.is_lao and pos > self.symbol_config.open_amount*4:
-                pos_to_sell = max(1, pos / 2)
-            OrderManager.sell_market(
-                self.symbol_config, 
-                round(price, self.symbol_config.price_precision), 
-                round(pos_to_sell, self.symbol_config.volume_precision)
-            )
-            msg = '**[{}][TP] Close Long: Profit {:0,.2f}% ({:0,.2f}%)'.format(
-                self.symbol_config.symbol, profit_ratio, tp_ratio)
-            await TelegramManager.send_message(msg)
-            self.leftover = 0
+#         # 익절
+#         if pos > 0 and profit_ratio >= tp_ratio:
+#             pos_to_sell = pos
+#             if self.symbol_config.is_lao and pos > self.symbol_config.open_amount*4:
+#                 pos_to_sell = max(1, pos / 2)
+#             OrderManager.sell_market(
+#                 self.symbol_config, 
+#                 round(price, self.symbol_config.price_precision), 
+#                 round(pos_to_sell, self.symbol_config.volume_precision)
+#             )
+#             msg = '**[{}][TP] Close Long: Profit {:0,.2f}% ({:0,.2f}%)'.format(
+#                 self.symbol_config.symbol, profit_ratio, tp_ratio)
+#             await TelegramManager.send_message(msg)
+#             self.leftover = 0
 
-        # 손절(자동 손절)
-        # elif pos > 0 and profit_ratio <= sl_ratio:
-        #     pos_to_sell = pos
-        #     OrderManager.sell_market(
-        #         self.symbol_config, 
-        #         round(price, self.symbol_config.price_precision), 
-        #         round(pos_to_sell, self.symbol_config.volume_precision)
-        #     )
-        #     msg = '**[{}][SL] Close Long: Profit {:0,.2f}% ({:0,.2f}%)'.format(
-        #         self.symbol_config.symbol, profit_ratio, sl_ratio)
-        #     await TelegramManager.send_message(msg)
-        #     self.leftover = 0
-        # 손절 알림만 (자동 실행 제거)
-        elif pos > 0 and profit_ratio <= sl_ratio:
-            # 손절 알림 플래그 설정 (중복 알림 방지)
-            if not hasattr(self, 'sl_alert_sent') or not self.sl_alert_sent:
-                current_value = pos * price
-                loss_amount = current_value - (pos * entry_price)
+#         # 손절(자동 손절)
+#         # elif pos > 0 and profit_ratio <= sl_ratio:
+#         #     pos_to_sell = pos
+#         #     OrderManager.sell_market(
+#         #         self.symbol_config, 
+#         #         round(price, self.symbol_config.price_precision), 
+#         #         round(pos_to_sell, self.symbol_config.volume_precision)
+#         #     )
+#         #     msg = '**[{}][SL] Close Long: Profit {:0,.2f}% ({:0,.2f}%)'.format(
+#         #         self.symbol_config.symbol, profit_ratio, sl_ratio)
+#         #     await TelegramManager.send_message(msg)
+#         #     self.leftover = 0
+#         # 손절 알림만 (자동 실행 제거)
+#         elif pos > 0 and profit_ratio <= sl_ratio:
+#             # 손절 알림 플래그 설정 (중복 알림 방지)
+#             if not hasattr(self, 'sl_alert_sent') or not self.sl_alert_sent:
+#                 current_value = pos * price
+#                 loss_amount = current_value - (pos * entry_price)
                 
-                msg = f"""
-    🚨 **STOP LOSS ALERT** 🚨
-    ━━━━━━━━━━━━━━━━━━━━
-    Symbol: {self.symbol_config.symbol}
-    Current Price: ${price:,.2f}
-    Entry Price: ${entry_price:,.2f}
-    Loss: {profit_ratio:.2f}% (Trigger: {sl_ratio:.2f}%)
-    Position Value: ${current_value:,.2f}
-    Loss Amount: ${loss_amount:,.2f}
-    ━━━━━━━━━━━━━━━━━━━━
-    ⚠️ **Manual action required!**
-    Use /close_position {self.symbol_config.symbol} to close
-    or /ignore_sl {self.symbol_config.symbol} to ignore
-                """
-                await TelegramManager.send_message(msg)
-                self.sl_alert_sent = True
-                logger.warning(f"[{self.symbol_config.symbol}] Stop loss triggered but not executed - Alert sent")
+#                 msg = f"""
+#     🚨 **STOP LOSS ALERT** 🚨
+#     ━━━━━━━━━━━━━━━━━━━━
+#     Symbol: {self.symbol_config.symbol}
+#     Current Price: ${price:,.2f}
+#     Entry Price: ${entry_price:,.2f}
+#     Loss: {profit_ratio:.2f}% (Trigger: {sl_ratio:.2f}%)
+#     Position Value: ${current_value:,.2f}
+#     Loss Amount: ${loss_amount:,.2f}
+#     ━━━━━━━━━━━━━━━━━━━━
+#     ⚠️ **Manual action required!**
+#     Use /close_position {self.symbol_config.symbol} to close
+#     or /ignore_sl {self.symbol_config.symbol} to ignore
+#                 """
+#                 await TelegramManager.send_message(msg)
+#                 self.sl_alert_sent = True
+#                 logger.warning(f"[{self.symbol_config.symbol}] Stop loss triggered but not executed - Alert sent")
         
-        # 손절선 회복 시 플래그 리셋
-        elif pos > 0 and profit_ratio > sl_ratio + 2:  # 손절선보다 2% 위로 회복
-            self.sl_alert_sent = False
+#         # 손절선 회복 시 플래그 리셋
+#         elif pos > 0 and profit_ratio > sl_ratio + 2:  # 손절선보다 2% 위로 회복
+#             self.sl_alert_sent = False
 
-        # 신규 매수 (reduce_only가 False일 때만)
-        elif total_buy_amount < max_amount and not self.symbol_config.reduce_only:
-            buy_amount = self.symbol_config.open_amount
-            if buy_amount > 0:
-                if self.symbol_config.is_lao and profit_ratio >= 0:
-                    buy_amount /= 2
-                self.leftover += buy_amount
-                buy_volume = round(self.leftover / price, self.symbol_config.volume_precision)
+#         # 신규 매수 (reduce_only가 False일 때만)
+#         elif total_buy_amount < max_amount and not self.symbol_config.reduce_only:
+#             buy_amount = self.symbol_config.open_amount
+#             if buy_amount > 0:
+#                 if self.symbol_config.is_lao and profit_ratio >= 0:
+#                     buy_amount /= 2
+#                 self.leftover += buy_amount
+#                 buy_volume = round(self.leftover / price, self.symbol_config.volume_precision)
 
-                if buy_volume > 0:
-                    OrderManager.buy_market(
-                        self.symbol_config, 
-                        round(price, self.symbol_config.price_precision), 
-                        buy_volume
-                    )
-                    msg = '[{}] Open Price {}, Qty ${:0,.0f}+{:0,.0f}, Profit {:0,.2f}%'.format(
-                        self.symbol_config.symbol, price, buy_volume*price, 
-                        self.position_amt['LONG']*price, profit_ratio)
-                    await TelegramManager.send_message(msg)
+#                 if buy_volume > 0:
+#                     OrderManager.buy_market(
+#                         self.symbol_config, 
+#                         round(price, self.symbol_config.price_precision), 
+#                         buy_volume
+#                     )
+#                     msg = '[{}] Open Price {}, Qty ${:0,.0f}+{:0,.0f}, Profit {:0,.2f}%'.format(
+#                         self.symbol_config.symbol, price, buy_volume*price, 
+#                         self.position_amt['LONG']*price, profit_ratio)
+#                     await TelegramManager.send_message(msg)
                 
-                self.leftover -= buy_volume * price if buy_volume > 0 else 0
-        else:
-            if self.symbol_config.reduce_only and pos == 0:
-                return
-            self.leftover = 0
-            if total_buy_amount >= max_amount:
-                msg = '**[{}][Max] Current ${:0,.2f} (Max ${:0,.2f})'.format(
-                    self.symbol_config.symbol, pos * entry_price if entry_price > 0 else 0, max_amount)
-                await TelegramManager.send_message(msg)
+#                 self.leftover -= buy_volume * price if buy_volume > 0 else 0
+#         else:
+#             if self.symbol_config.reduce_only and pos == 0:
+#                 return
+#             self.leftover = 0
+#             if total_buy_amount >= max_amount:
+#                 msg = '**[{}][Max] Current ${:0,.2f} (Max ${:0,.2f})'.format(
+#                     self.symbol_config.symbol, pos * entry_price if entry_price > 0 else 0, max_amount)
+#                 await TelegramManager.send_message(msg)
 
-    async def trade_short(self):
-        """DCA Short 트레이딩 (구현 필요)"""
-        pass
+#     async def trade_short(self):
+#         """DCA Short 트레이딩 (구현 필요)"""
+#         pass
 
-    async def trade_va(self):
-        """VA 전략 실행"""
-        if self.symbol_config.direction == 'LONG':
-            await self.trade_long_va()
-        elif self.symbol_config.direction == 'SHORT':
-            await self.trade_short_va()
+#     async def trade_va(self):
+#         """VA 전략 실행"""
+#         if self.symbol_config.direction == 'LONG':
+#             await self.trade_long_va()
+#         elif self.symbol_config.direction == 'SHORT':
+#             await self.trade_short_va()
 
-    async def trade_long_va(self):
-        """VA Long 트레이딩"""
-        price = self.current_price()
-        pos = self.position_amt['LONG']
-        entry_price = self.entry_price['LONG']
+#     async def trade_long_va(self):
+#         """VA Long 트레이딩"""
+#         price = self.current_price()
+#         pos = self.position_amt['LONG']
+#         entry_price = self.entry_price['LONG']
         
-        current_asset_value = pos * price
-        difference = self.va_target_amount - current_asset_value
-        profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
+#         current_asset_value = pos * price
+#         difference = self.va_target_amount - current_asset_value
+#         profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
         
-        # 익절/손절
-        if pos > 0:
-            if profit_ratio >= self.symbol_config.take_profit_ratio or \
-               profit_ratio <= self.symbol_config.stop_loss_ratio:
-                OrderManager.sell_market(
-                    self.symbol_config,
-                    round(price, self.symbol_config.price_precision),
-                    round(pos, self.symbol_config.volume_precision)
-                )
-                self.va_target_amount = self.symbol_config.open_amount
+#         # 익절/손절
+#         if pos > 0:
+#             if profit_ratio >= self.symbol_config.take_profit_ratio or \
+#                profit_ratio <= self.symbol_config.stop_loss_ratio:
+#                 OrderManager.sell_market(
+#                     self.symbol_config,
+#                     round(price, self.symbol_config.price_precision),
+#                     round(pos, self.symbol_config.volume_precision)
+#                 )
+#                 self.va_target_amount = self.symbol_config.open_amount
                 
-                action = 'TP' if profit_ratio >= self.symbol_config.take_profit_ratio else 'SL'
-                msg = f'**[{self.symbol_config.symbol}][{action}] VA Close: Profit {profit_ratio:.2f}%'
-                await TelegramManager.send_message(msg)
-                return
+#                 action = 'TP' if profit_ratio >= self.symbol_config.take_profit_ratio else 'SL'
+#                 msg = f'**[{self.symbol_config.symbol}][{action}] VA Close: Profit {profit_ratio:.2f}%'
+#                 await TelegramManager.send_message(msg)
+#                 return
         
-        # reduce_only 체크
-        if self.symbol_config.reduce_only:
-            return
+#         # reduce_only 체크
+#         if self.symbol_config.reduce_only:
+#             return
         
-        # VA 리밸런싱
-        if difference > 0 and current_asset_value + difference <= self.symbol_config.max_amount:
-            buy_volume = round(difference / price, self.symbol_config.volume_precision)
-            if buy_volume > 0 and difference > 100:
-                OrderManager.buy_market(
-                    self.symbol_config,
-                    round(price, self.symbol_config.price_precision),
-                    buy_volume
-                )
-                msg = f'[{self.symbol_config.symbol}] VA Buy: ${difference:.0f} at {price}'
-                await TelegramManager.send_message(msg)
-        elif difference < 0 and difference > 100:
-            sell_volume = round(-difference / price, self.symbol_config.volume_precision)
-            sell_volume = min(sell_volume, pos)
-            if sell_volume > 0:
-                OrderManager.sell_market(
-                    self.symbol_config,
-                    round(price, self.symbol_config.price_precision),
-                    sell_volume
-                )
-                msg = f'[{self.symbol_config.symbol}] VA Sell: ${-difference:.0f} at {price}'
-                await TelegramManager.send_message(msg)
+#         # VA 리밸런싱
+#         if difference > 0 and current_asset_value + difference <= self.symbol_config.max_amount:
+#             buy_volume = round(difference / price, self.symbol_config.volume_precision)
+#             if buy_volume > 0 and difference > 100:
+#                 OrderManager.buy_market(
+#                     self.symbol_config,
+#                     round(price, self.symbol_config.price_precision),
+#                     buy_volume
+#                 )
+#                 msg = f'[{self.symbol_config.symbol}] VA Buy: ${difference:.0f} at {price}'
+#                 await TelegramManager.send_message(msg)
+#         elif difference < 0 and difference > 100:
+#             sell_volume = round(-difference / price, self.symbol_config.volume_precision)
+#             sell_volume = min(sell_volume, pos)
+#             if sell_volume > 0:
+#                 OrderManager.sell_market(
+#                     self.symbol_config,
+#                     round(price, self.symbol_config.price_precision),
+#                     sell_volume
+#                 )
+#                 msg = f'[{self.symbol_config.symbol}] VA Sell: ${-difference:.0f} at {price}'
+#                 await TelegramManager.send_message(msg)
         
-        # 타겟 증가
-        self.va_target_amount *= (1 + self.symbol_config.increase_rate/100.0)
+#         # 타겟 증가
+#         self.va_target_amount *= (1 + self.symbol_config.increase_rate/100.0)
 
-    async def trade_short_va(self):
-        """VA Short 트레이딩 (구현 필요)"""
-        pass
+#     async def trade_short_va(self):
+#         """VA Short 트레이딩 (구현 필요)"""
+#         pass
 
 # ==========================================
 # Enhanced Trader
 # ==========================================
 
 class EnhancedTrader:
+    # def __init__(self):
+    #     self.pos_info_dict = dict()
+    #     for symbol in TradeConfig.trade_config:
+    #         self.pos_info_dict[symbol] = PosInfo(TradeConfig.trade_config[symbol])
+
+    #     # 비동기로 초기 데이터 로드
+    #     self.initial_data_loaded = False
     def __init__(self):
         self.pos_info_dict = dict()
-        for symbol in TradeConfig.trade_config:
-            self.pos_info_dict[symbol] = PosInfo(TradeConfig.trade_config[symbol])
-
-        # 비동기로 초기 데이터 로드
+        for symbol, cfg in TradeConfig.trade_config.items():
+            self.pos_info_dict[symbol] = PosInfo(
+                cfg,
+                position_analyzer=position_analyzer,
+                state_manager=state_manager,
+                send_message=TelegramManager.send_message,
+                logger=logger,
+            )
         self.initial_data_loaded = False
 
     async def initialize_historical_data(self):
@@ -864,7 +879,6 @@ class EnhancedTrader:
             
         return report
 
-trader = EnhancedTrader()
 
 # ==========================================
 # Alarm Manager
