@@ -120,7 +120,7 @@ class Commands:
                 profit = ((current - entry) / entry * 100) if entry > 0 else 0
 
                 lines.append(f"\n<b>{html.escape(symbol)}</b>")
-                lines.append(f"• Amount: {pos_long:.2f}")
+                lines.append(f"• Volume: {pos_long:.4f}")
                 lines.append(f"• Entry: ${entry:.2f}")
                 lines.append(f"• Current: ${current:.2f}")
                 lines.append(f"• Value: ${value:,.2f}")
@@ -173,6 +173,58 @@ class Commands:
         await self.s.trader.update_all()
         await self._send_html(update, "All positions updated")
 
+    async def update(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /update              -> 현재 심볼만 업데이트+트레이드
+        /update SYMBOL       -> 특정 심볼만 업데이트+트레이드
+        """
+        TC = self.s.trade_config
+
+        # 대상 심볼 결정
+        if len(context.args) == 0:
+            if not TC.current_symbol:
+                await self._send_html(update, "No current symbol set. Use <code>/current SYMBOL</code> first")
+                return
+            symbol = TC.current_symbol
+        elif len(context.args) == 1:
+            symbol = str(context.args[0]).upper()
+        else:
+            await self._send_html(update, "Usage: <code>/update</code> or <code>/update SYMBOL</code>")
+            return
+
+        pos_info = self.s.trader.pos_info_dict.get(symbol)
+        if not pos_info:
+            await self._send_html(update, f"Symbol <b>{html.escape(symbol)}</b> not found")
+            return
+
+        # 실행
+        ok = await self.s.trader.update_symbol(symbol)
+
+        # 응답 메시지
+        if not ok:
+            # stop_trade 등으로 스킵된 경우
+            cfg = self.s.trade_config.trade_config.get(symbol)
+            reason = ""
+            if cfg and getattr(cfg, "stop_trade", False):
+                reason = " (trading is <b>stopped</b> for this symbol)"
+            await self._send_html(update, f"Update skipped for <b>{html.escape(symbol)}</b>{reason}")
+            return
+
+        # 간단 요약
+        price = pos_info.price
+        pos = pos_info.position_amt["LONG"]
+        entry = pos_info.entry_price["LONG"]
+        pnl = ((price - entry) / entry * 100) if entry > 0 else 0.0
+        lines = [
+            f"✅ <b>Updated {html.escape(symbol)}</b>",
+            f"{SEP}",
+            f"• Market State: <code>{html.escape(self.s.state_manager.current_state)}</code>",
+            f"• Price: ${price:,.2f}",
+        ]
+        if pos > 0:
+            lines.append(f"• Position: {pos:.4f}  |  P/L: {pnl:+.2f}%")
+        await self._send_html(update, "\n".join(lines))
+
     # =========================
     # Configuration
     # =========================
@@ -201,7 +253,7 @@ class Commands:
             output = "Usage: <code>/current [SYMBOL]</code>"
         await self._send_html(update, output)
 
-    async def volume(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         TC = self.s.trade_config
         symbol_config = TC.current_symbol_config()
         if not symbol_config:
@@ -209,17 +261,17 @@ class Commands:
             return
 
         if len(context.args) == 0:
-            output = f"Trading Volume for <b>{html.escape(TC.current_symbol)}</b>: ${symbol_config.open_amount:.0f}"
+            output = f"Trading Amount for <b>{html.escape(TC.current_symbol)}</b>: ${symbol_config.open_amount:.0f}"
         elif len(context.args) == 1:
             try:
                 vol = float(context.args[0])
                 symbol_config.base_open_amount = vol
                 symbol_config.open_amount = vol
-                output = f"Volume set to ${vol:.0f} for <b>{html.escape(TC.current_symbol)}</b>"
+                output = f"Amount set to ${vol:.0f} for <b>{html.escape(TC.current_symbol)}</b>"
             except ValueError:
-                output = "Invalid volume. Use: <code>/volume [amount]</code>"
+                output = "Invalid amount. Use: <code>/amount [amount]</code>"
         else:
-            output = "Usage: <code>/volume [amount]</code>"
+            output = "Usage: <code>/amount [amount]</code>"
         await self._send_html(update, output)
 
     async def max_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -242,6 +294,82 @@ class Commands:
         else:
             output = "Usage: <code>/max_amount [amount]</code>"
         await self._send_html(update, output)
+
+    async def target(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        /target                -> 현재 심볼의 타겟 조회
+        /target AMOUNT         -> 현재 심볼의 타겟 설정
+        /target SYMBOL AMOUNT  -> 특정 심볼의 타겟 설정
+        """
+        TC = self.s.trade_config
+
+        # 0개 인자: 조회 (현재 심볼 필요)
+        if len(context.args) == 0:
+            if not TC.current_symbol:
+                await self._send_html(update, "No current symbol set. Use <code>/current SYMBOL</code> first")
+                return
+            symbol = TC.current_symbol
+            pos_info = self.s.trader.pos_info_dict.get(symbol)
+            if not pos_info:
+                await self._send_html(update, f"Symbol <b>{html.escape(symbol)}</b> not found")
+                return
+            note = ""
+            cfg = TC.trade_config.get(symbol)
+            if cfg and not getattr(cfg, "is_va", False):
+                note = " <i>(DCA mode; VA target is used only in VA strategy)</i>"
+            await self._send_html(
+                update,
+                f"VA target for <b>{html.escape(symbol)}</b>: <b>${pos_info.va_target_amount:,.0f}</b>{note}"
+            )
+            return
+
+        # 1개 인자: 현재 심볼의 타겟 설정
+        if len(context.args) == 1:
+            if not TC.current_symbol:
+                await self._send_html(update, "No current symbol set. Use <code>/current SYMBOL</code> first")
+                return
+            symbol = TC.current_symbol
+            try:
+                amount = float(context.args[0])
+            except ValueError:
+                await self._send_html(update, "Invalid amount. Use: <code>/target [amount]</code> or <code>/target SYMBOL amount</code>")
+                return
+
+        # 2개 인자: 특정 심볼의 타겟 설정
+        elif len(context.args) == 2:
+            symbol = str(context.args[0]).upper()
+            try:
+                amount = float(context.args[1])
+            except ValueError:
+                await self._send_html(update, "Invalid amount. Use: <code>/target SYMBOL amount</code>")
+                return
+        else:
+            await self._send_html(update, "Usage: <code>/target [amount]</code> or <code>/target SYMBOL amount</code>")
+            return
+
+        # 공통: 설정 적용
+        if amount <= 0:
+            await self._send_html(update, "Amount must be positive.")
+            return
+
+        pos_info = self.s.trader.pos_info_dict.get(symbol)
+        if not pos_info:
+            await self._send_html(update, f"Symbol <b>{html.escape(symbol)}</b> not found")
+            return
+
+        old = pos_info.va_target_amount
+        pos_info.va_target_amount = amount
+
+        extra = ""
+        cfg = TC.trade_config.get(symbol)
+        if cfg and not getattr(cfg, "is_va", False):
+            extra = " <i>(Note: current strategy is DCA; VA target is only used in VA)</i>"
+
+        await self._send_html(
+            update,
+            f"VA target for <b>{html.escape(symbol)}</b> updated from "
+            f"<b>${old:,.0f}</b> to <b>${amount:,.0f}</b>.{extra}"
+        )
 
     async def take_profit_ratio(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         TC = self.s.trade_config
@@ -412,8 +540,9 @@ class Commands:
 
 ⚙️ <b>Configuration</b>
 /current [SYMBOL] - Select/view symbol
-/volume [amount] - Set trading volume
+/amount [amount] - Set trading amount
 /max_amount [amount] - Set max limit
+/target [amount]|SYMBOL amount - Set/view VA target
 /take_profit_ratio [%] - Set TP ratio
 /stop_loss_ratio [%] - Set SL ratio
 
@@ -424,6 +553,7 @@ class Commands:
 /close_position SYMBOL - Close position
 /reduce_position SYMBOL % - Reduce position
 /update_all - Force update all
+/update SYMBOL - Update & trade the specified symbol
 /ignore_sl SYMBOL - Ignore SL alert
 /sl_status - Check stop loss status
 
@@ -535,11 +665,13 @@ def register(application: Application, cmds: Commands):
         "list": cmds.list_cmd,
         "symbol": cmds.symbol,
         "update_all": cmds.update_all,
+        "update": cmds.update,
 
         # Configuration
         "current": cmds.current,
-        "volume": cmds.volume,
+        "amount": cmds.amount,
         "max_amount": cmds.max_amount,
+        "target": cmds.target,
         "take_profit_ratio": cmds.take_profit_ratio,
         "stop_loss_ratio": cmds.stop_loss_ratio,
 

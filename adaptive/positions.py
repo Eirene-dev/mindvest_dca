@@ -7,6 +7,7 @@ from typing import Optional, Callable, Awaitable
 
 from adaptive.exchange import OrderManager, BinanceTrader
 
+logger = logging.getLogger('PosInfo')
 
 class PositionState(Enum):
     NoPos = 0
@@ -45,6 +46,7 @@ class PosInfo:
         self.close_price = self.price
         self.leftover = 0
         self.va_target_amount = symbol_config.open_amount
+        self.sl_alert_sent = False
 
         # 초기 히스토리컬 데이터 로드
         self.load_initial_history()
@@ -144,8 +146,12 @@ class PosInfo:
         total_buy_amount = pos * entry_price + self.symbol_config.open_amount if entry_price > 0 else self.symbol_config.open_amount
         max_amount = self.symbol_config.max_amount
 
-        print(f'{datetime.now()} {self.symbol_config.symbol} Profit: {profit_ratio:0,.2f}%, Target: {tp_ratio:0,.2f}%')
+        logger.info(f'{datetime.now()} {self.symbol_config.symbol}, Profit: {profit_ratio:0,.2f}%, Target: {tp_ratio:0,.2f}%, Buy: {total_buy_amount:0,.2f}, Max: ${max_amount}, Reduce: {self.symbol_config.reduce_only}')
 
+        # 손절선 회복 시 알림 플래그 해제
+        if self.sl_alert_sent and pos > 0 and profit_ratio > sl_ratio + 2:
+            self.sl_alert_sent = False
+        
         # 익절
         if pos > 0 and profit_ratio >= tp_ratio:
             pos_to_sell = pos
@@ -178,13 +184,10 @@ Loss Amount: ${loss_amount:,.2f}
                 self.sl_alert_sent = True
                 self.logger.warning(f"[{self.symbol_config.symbol}] Stop loss triggered but not executed - Alert sent")
 
-        # 손절선 회복 시 알림 플래그 해제
-        elif pos > 0 and profit_ratio > sl_ratio + 2:
-            self.sl_alert_sent = False
-
         # 신규 매수
         elif total_buy_amount < max_amount and not self.symbol_config.reduce_only:
             buy_amount = self.symbol_config.open_amount
+            
             if buy_amount > 0:
                 if self.symbol_config.is_lao and profit_ratio >= 0:
                     buy_amount /= 2
@@ -224,6 +227,8 @@ Loss Amount: ${loss_amount:,.2f}
         entry_price = self.entry_price['LONG']
 
         current_asset_value = pos * price
+        if pos <= 0:
+            self.va_target_amount = self.symbol_config.open_amount
         difference = self.va_target_amount - current_asset_value
         profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
 

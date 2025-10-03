@@ -155,7 +155,7 @@ class SymbolInfo:
         self.is_va = config_loader.is_va
         self.increase_rate = config_loader.increase_rate
         self.leftover = 0
-        self.stop_trade = False
+        self.stop_trade = True
 
     def __str__(self):
         return 'Symbol {}, Amount {:,}, Max {}, Strategy {}, TP {}%, SL {}%'.format(

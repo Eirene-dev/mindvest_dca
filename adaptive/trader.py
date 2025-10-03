@@ -76,6 +76,7 @@ class EnhancedTrader:
 
         # 각 심볼 트레이드 실행
         for symbol, pos in self.pos_info_dict.items():
+            
             if pos.symbol_config.stop_trade:
                 continue
 
@@ -86,6 +87,31 @@ class EnhancedTrader:
             # 전략 실행
             await pos.trade()
 
+    async def update_symbol(self, symbol: str) -> bool:
+        """
+        지정한 심볼만 포지션/가격 갱신 후 전략 실행.
+        - 전체 상태 업데이트와 익스포저 체크는 그대로 수행
+        - stop_trade 인 경우 False 반환
+        """
+        # 시장 상태 갱신 및 익스포저 체크
+        await self.state_manager.update_state()
+        state_params = self.state_manager.get_strategy_params()
+        await self.check_exposure_limits(state_params)
+
+        pos = self.pos_info_dict.get(symbol)
+        if not pos:
+            self.logger.warning(f"update_symbol: {symbol} not found")
+            return False
+        if pos.symbol_config.stop_trade:
+            self.logger.info(f"update_symbol: {symbol} is set to stop_trade; skipping")
+            return False
+
+        # 포지션/가격 갱신 + 전략 실행
+        pos.update(BinanceTrader.client)
+        pos.current_price()
+        await pos.trade()
+        return True
+    
     # ---------------------------
     # 리포트/리스크/포지션 관리
     # ---------------------------
