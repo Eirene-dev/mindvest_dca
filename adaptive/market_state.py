@@ -2,7 +2,7 @@
 from typing import Any, Dict, List, Optional, Callable, Awaitable
 from datetime import datetime
 import logging
-
+import html
 
 class MarketStateManager:
     """
@@ -94,26 +94,43 @@ class MarketStateManager:
                     await self._close_position_cb(symbol)
 
     async def notify_state_change(self, market_data: Dict[str, Any]) -> None:
-        """상태 변경 텔레그램 알림"""
+        """상태 변경 텔레그램 알림 (HTML 포맷)"""
         try:
             old_strategy = self.state_strategy_matrix.get(self.last_state, {})
             new_strategy = self.state_strategy_matrix.get(self.current_state, {})
-            msg = f"""
-🔄 **Market State Changed**
-━━━━━━━━━━━━━━━━━━━━
-From: {self.last_state} ({old_strategy.get('description','')})
-To: {self.current_state} ({new_strategy.get('description','')})
-━━━━━━━━━━━━━━━━━━━━
-📊 Confidence: {self.state_confidence:.1%}
-💰 BTC Price: ${market_data.get('btc_price', 0):,.0f}
-📈 Breadth: {market_data.get('breadth_above50', 0.5):.1%}
-━━━━━━━━━━━━━━━━━━━━
-Amount Multiplier: {new_strategy.get('amount_multiplier')}
-Trading Interval: {new_strategy.get('interval_hours')}h
-Allowed Symbols: {', '.join(new_strategy.get('allowed_symbols', []))}
-"""
+
+            # 안전 이스케이프
+            last_state = html.escape(self.last_state)
+            current_state = html.escape(self.current_state)
+            old_desc = html.escape(old_strategy.get("description", ""))
+            new_desc = html.escape(new_strategy.get("description", ""))
+            amount_mult = html.escape(str(new_strategy.get("amount_multiplier", "")))
+            interval_hours = html.escape(str(new_strategy.get("interval_hours", "")))
+            symbols = ", ".join(html.escape(s) for s in new_strategy.get("allowed_symbols", []))
+
+            confidence = f"{self.state_confidence:.1%}"
+            btc_price = f"${market_data.get('btc_price', 0):,.0f}"
+            breadth = f"{market_data.get('breadth_above50', 0.5):.1%}"
+
+            msg = (
+                "🔄 <b>Market State Changed</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"From: <code>{last_state}</code> ({old_desc})\n"
+                f"To: <code>{current_state}</code> ({new_desc})\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"📊 Confidence: {confidence}\n"
+                f"💰 BTC Price: {btc_price}\n"
+                f"📈 Breadth: {breadth}\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"Amount Multiplier: {amount_mult}\n"
+                f"Trading Interval: {interval_hours}h\n"
+                f"Allowed Symbols: {symbols}\n"
+            )
+
             if self._send_message:
+                # _send_message가 parse_mode=HTML로 전송하도록 구현되어 있어야 함
                 await self._send_message(msg)
+
             self.logger.info(f"Market state changed: {self.last_state} -> {self.current_state}")
         except Exception as e:
             self.logger.error(f"Error in notify_state_change: {e}")

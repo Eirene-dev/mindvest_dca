@@ -5,6 +5,7 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Callable, Awaitable, Optional
+import html
 
 from adaptive.positions import PosInfo
 from adaptive.exchange import OrderManager, BinanceTrader
@@ -89,9 +90,7 @@ class EnhancedTrader:
     # 리포트/리스크/포지션 관리
     # ---------------------------
     async def get_risk_report(self) -> str:
-        report = "💰 **Risk Management Report**\n"
-        report += "━━━━━━━━━━━━━━━━━━━━\n"
-
+        lines = ["💰 <b>Risk Management Report</b>", "━━━━━━━━━━━━━━━━━━━━"]
         total_exposure = 0.0
         total_max_exposure = 0.0
 
@@ -101,23 +100,19 @@ class EnhancedTrader:
             total_exposure += current_value
             total_max_exposure += cfg.max_amount
 
-            util = (current_value / cfg.max_amount * 100) if cfg.max_amount > 0 else 0.0
-            report += (
-                f"\n**{symbol}**\n"
-                f"• Current: ${current_value:,.0f}\n"
-                f"• Max Allowed: ${cfg.max_amount:,.0f}\n"
-                f"• Base Max: ${cfg.base_max_amount:,.0f}\n"
-                f"• Utilization: {util:.1f}%\n"
-            )
+            lines.append(f"\n<b>{html.escape(symbol)}</b>")
+            lines.append(f"• Current: ${current_value:,.0f}")
+            lines.append(f"• Max Allowed: ${cfg.max_amount:,.0f}")
+            lines.append(f"• Base Max: ${cfg.base_max_amount:,.0f}")
+            util = (current_value / cfg.max_amount * 100) if cfg.max_amount > 0 else 0
+            lines.append(f"• Utilization: {util:.1f}%")
 
-        report += (
-            f"\n**Total Portfolio**\n"
-            f"• Current Exposure: ${total_exposure:,.0f}\n"
-            f"• Max Allowed: ${total_max_exposure:,.0f}\n"
-            f"• Portfolio Limit: ${self.portfolio_limit:,.0f}\n"
-            f"• Utilization: {(total_exposure / self.portfolio_limit * 100):.1f}%\n"
-        )
-        return report
+        lines.append("\n<b>Total Portfolio</b>")
+        lines.append(f"• Current Exposure: ${total_exposure:,.0f}")
+        lines.append(f"• Max Allowed: ${total_max_exposure:,.0f}")
+        lines.append(f"• Portfolio Limit: ${self.portfolio_limit:,.0f}")
+        lines.append(f"• Utilization: {(total_exposure / self.portfolio_limit * 100):.1f}%")
+        return "\n".join(lines)
 
     async def check_exposure_limits(self, state_params):
         total_exposure = 0.0
@@ -163,24 +158,24 @@ class EnhancedTrader:
         await self.reduce_position(symbol, 1.0)
 
     async def get_position_analysis_report(self) -> str:
-        report = "📊 **Position Analysis Report**\n"
-        report += "━━━━━━━━━━━━━━━━━━━━\n"
-
+        lines = ["📊 <b>Position Analysis Report</b>", "━━━━━━━━━━━━━━━━━━━━"]
         for symbol, position_info in self.pos_info_dict.items():
             score = self.position_analyzer.get_position_score(symbol)
-            report += (
-                f"\n**{symbol}**\n"
-                f"• Position: {score['position_label']}\n"
-                f"• Score: {score['combined_score']:.1f}/100\n"
-                f"• RSI: {score['rsi']:.1f}\n"
-                f"• Momentum: {score['momentum']:+.1f}%\n"
-            )
 
-            pos = position_info.position_amt['LONG']
+            sym = html.escape(symbol)
+            pos_label = html.escape(score["position_label"])
+
+            lines.append(f"\n<b>{sym}</b>")
+            lines.append(f"• Position: {pos_label}")
+            lines.append(f"• Score: {score['combined_score']:.1f}/100")
+            lines.append(f"• RSI: {score['rsi']:.1f}")
+            lines.append(f"• Momentum: {score['momentum']:+.1f}%")
+
+            pos = position_info.position_amt["LONG"]
             if pos > 0:
-                entry = position_info.entry_price['LONG']
+                entry = position_info.entry_price["LONG"]
                 current = position_info.price
                 profit = ((current - entry) / entry * 100) if entry > 0 else 0
-                report += f"• Holdings: ${pos * current:.0f} ({profit:+.1f}%)\n"
-
-        return report
+                value = pos * current
+                lines.append(f"• Holdings: ${value:,.0f} ({profit:+.1f}%)")
+        return "\n".join(lines)

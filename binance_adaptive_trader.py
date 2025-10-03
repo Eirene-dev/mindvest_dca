@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 # Telegram
 from telegram import ForceReply, Update
 from telegram.ext import filters, CallbackContext, CommandHandler, ApplicationBuilder, ContextTypes, MessageHandler
+from telegram.constants import ParseMode
 
 # Plotting
 import matplotlib
@@ -80,23 +81,15 @@ logger.addHandler(file_handler)
 # ==========================================
 # Telegram Manager
 # ==========================================
-
 class TelegramManager:
     @staticmethod
-    async def send_message(msg):
-        global application
-        try:
-            # HTML 파싱으로 변경
-            msg = msg.replace('**', '<b>').replace('**', '</b>')
-            msg = msg.replace('*', '<i>').replace('*', '</i>')
-            await application.bot.send_message(chat_id=CHAT_ID, text=msg)
-        except Exception as e:
-            # 파싱 실패시 plain text로 재시도
-            try:
-                await application.bot.send_message(chat_id=CHAT_ID, text=msg)
-            except:
-                logger.error(f"Telegram send error: {e}")
-
+    async def send_message(msg: str):
+        await application.bot.send_message(
+            chat_id=CHAT_ID,
+            text=msg,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
 
 # ==========================================
 # Adaptive Analyzers
@@ -171,7 +164,7 @@ class SymbolInfo:
             self.take_profit_ratio, self.stop_loss_ratio)
 
 class AdaptiveSymbolInfo(SymbolInfo):
-    """시장 상태와 자산 위치를 모두 고려하는 심볼 정보 (max_amount 동적 조정 포함)"""
+    """시장 상태와 자산 위치를 모두 고려하는 심볼 정보"""
     
     def __init__(self, config_loader):
         super().__init__(config_loader)
