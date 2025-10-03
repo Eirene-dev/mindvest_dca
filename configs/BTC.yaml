@@ -1,0 +1,11 @@
+symbol: BTC
+price_precision: 1
+volume_precision: 3
+open_amount: 300
+max_amount: 6000
+direction: LONG
+take_profit_ratio: 5
+stop_loss_ratio: -50
+is_lao: true
+is_va: false
+increase_rate: 1
