@@ -7,25 +7,18 @@ Enhanced Market State-Aware Crypto Trading Bot with Dynamic Risk Management
 
 import os
 import sys
-import json
 import yaml
 import time
 import asyncio
 import logging
 import threading
-import requests
-import statistics
-import math
 from dotenv import load_dotenv
 from enum import Enum
 from datetime import datetime, timedelta
-from threading import Thread
-from typing import Dict, Optional, List
 
 # Trading Libraries
 from binance.client import Client
 import ccxt
-import numpy as np
 
 # Telegram
 from telegram import ForceReply, Update
@@ -40,7 +33,7 @@ import matplotlib.pyplot as plt
 from adaptive.position_analyzer import PositionAnalyzer
 from adaptive.db_manager import DatabaseManager
 from adaptive.commands import Services, Commands, register as register_bot_commands
-
+from adaptive.market_state import MarketStateManager
 from adaptive.policies import (
     SYMBOL_RISK_TIERS,
     TIER_MAX_MULTIPLIERS,
@@ -85,106 +78,6 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # ==========================================
-# Adaptive Analyzers
-# ==========================================
-position_analyzer = PositionAnalyzer(max_history_length=600)
-db_manager = DatabaseManager()
-
-
-# ==========================================
-# Market State Manager
-# ==========================================
-
-class MarketStateManager:
-    """시장 상태 관리자"""
-    
-    def __init__(self):
-        self.current_state = 'S4'
-        self.last_state = 'S4'
-        self.state_confidence = 0.5
-        self.state_changed_time = datetime.now()
-        self.last_update_time = datetime.now()
-        
-    async def update_state(self):
-        """시장 상태 업데이트"""
-        try:
-            market_data = db_manager.get_latest_market_state()
-            
-            if market_data and 'state' in market_data:
-                self.last_state = self.current_state
-                self.current_state = market_data['state']
-                self.state_confidence = market_data.get('confidence', 0.5)
-                self.last_update_time = datetime.now()
-                
-                # 상태 변경 감지 및 포지션 조정
-                if self.current_state != self.last_state:
-                    self.state_changed_time = datetime.now()
-                    await self.notify_state_change(market_data)
-                    await self.handle_state_transition()
-                    
-                return True
-        except Exception as e:
-            logger.error(f"Error updating state: {e}")
-        return False
-    
-    async def handle_state_transition(self):
-        """상태 전환 시 포지션 관리"""
-        global trader
-        
-        # S6 -> S7: 고위험 알트 50% 감축
-        if self.last_state == 'S6' and self.current_state == 'S7':
-            logger.info("State transition S6->S7: Reducing high-risk alts by 50%")
-            for symbol in SYMBOL_RISK_TIERS['TIER_3']:
-                if symbol in trader.pos_info_dict:
-                    await trader.reduce_position(symbol, 0.5)
-        
-        # S7 -> S8: 고위험 알트 전량 청산
-        elif self.last_state == 'S7' and self.current_state == 'S8':
-            logger.info("State transition S7->S8: Closing all high-risk alts")
-            for symbol in SYMBOL_RISK_TIERS['TIER_3']:
-                if symbol in trader.pos_info_dict:
-                    await trader.close_position(symbol)
-        
-        # S5/S6 -> S0/S1/S2: 긴급 청산
-        elif self.last_state in ['S5', 'S6'] and self.current_state in ['S0', 'S1', 'S2']:
-            logger.warning("Emergency state transition: Closing all alt positions")
-            for tier in ['TIER_3', 'TIER_2']:
-                for symbol in SYMBOL_RISK_TIERS[tier]:
-                    if symbol in trader.pos_info_dict:
-                        await trader.close_position(symbol)
-    
-    async def notify_state_change(self, market_data):
-        """상태 변경 알림"""
-        try:
-            old_strategy = STATE_STRATEGY_MATRIX[self.last_state]
-            new_strategy = STATE_STRATEGY_MATRIX[self.current_state]
-            
-            msg = f"""
-🔄 **Market State Changed**
-━━━━━━━━━━━━━━━━━━━━
-From: {self.last_state} ({old_strategy['description']})
-To: {self.current_state} ({new_strategy['description']})
-━━━━━━━━━━━━━━━━━━━━
-📊 Confidence: {self.state_confidence:.1%}
-💰 BTC Price: ${market_data.get('btc_price', 0):,.0f}
-📈 Breadth: {market_data.get('breadth_above50', 0.5):.1%}
-━━━━━━━━━━━━━━━━━━━━
-Amount Multiplier: {new_strategy['amount_multiplier']}x
-Trading Interval: {new_strategy['interval_hours']}h
-Allowed Symbols: {', '.join(new_strategy['allowed_symbols'])}
-            """
-            await TelegramManager.send_message(msg)
-            logger.info(f"Market state changed: {self.last_state} -> {self.current_state}")
-        except Exception as e:
-            logger.error(f"Error in notify_state_change: {e}")
-    
-    def get_strategy_params(self):
-        """현재 상태의 전략 파라미터 반환"""
-        return STATE_STRATEGY_MATRIX.get(self.current_state, STATE_STRATEGY_MATRIX['S4'])
-
-state_manager = MarketStateManager()
-
-# ==========================================
 # Telegram Manager
 # ==========================================
 
@@ -203,6 +96,21 @@ class TelegramManager:
                 await application.bot.send_message(chat_id=CHAT_ID, text=msg)
             except:
                 logger.error(f"Telegram send error: {e}")
+
+
+# ==========================================
+# Adaptive Analyzers
+# ==========================================
+position_analyzer = PositionAnalyzer(max_history_length=600)
+db_manager = DatabaseManager()
+
+state_manager = MarketStateManager(
+    db_manager=db_manager,
+    symbol_risk_tiers=SYMBOL_RISK_TIERS,
+    state_strategy_matrix=STATE_STRATEGY_MATRIX,
+    send_message=TelegramManager.send_message,
+    logger=logger,
+)
 
 # ==========================================
 # Configuration Classes
