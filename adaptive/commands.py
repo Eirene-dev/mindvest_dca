@@ -36,19 +36,80 @@ class Commands:
     # =========================
     # Status & Analysis
     # =========================
+    # async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    #     sm = self.s.state_manager
+    #     params = sm.get_strategy_params()
+
+    #     symbols = ", ".join(html.escape(s) for s in params["allowed_symbols"])
+
+    #     output = (
+    #         "<b>System Status</b>\n"
+    #         f"{SEP}\n"
+    #         f"🔹 Market State: <code>{html.escape(sm.current_state)}</code>\n"
+    #         f"🔹 Description: {html.escape(params['description'])}\n"
+    #         f"🔹 Confidence: {sm.state_confidence:.1%}\n"
+    #         f"🔹 Active Symbols: {symbols}\n"
+    #         f"\n<b>Trading Status</b>\n"
+    #     )
+
+    #     active_count = sum(1 for _, cfg in self.s.trade_config.trade_config.items() if not cfg.stop_trade)
+    #     stopped_count = sum(1 for _, cfg in self.s.trade_config.trade_config.items() if cfg.stop_trade)
+
+    #     output += f"• Active: <b>{active_count}</b> symbols\n"
+    #     output += f"• Stopped: <b>{stopped_count}</b> symbols\n"
+
+    #     await self._send_html(update, output)
+
+    # async def market_state(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    #     await self.s.state_manager.update_state()
+    #     params = self.s.state_manager.get_strategy_params()
+    #     output = (
+    #         "<b>Current Market State</b>\n"
+    #         f"{SEP}\n"
+    #         f"• State: <code>{html.escape(self.s.state_manager.current_state)}</code>\n"
+    #         f"• Description: {html.escape(params['description'])}\n"
+    #         f"• Confidence: {self.s.state_manager.state_confidence:.1%}\n"
+    #         f"• Last Update: {html.escape(self.s.state_manager.last_update_time.strftime('%Y-%m-%d %H:%M:%S'))}\n"
+    #     )
+    #     await self._send_html(update, output)
+    # =========================
+    # Status & Analysis (Updated)
+    # =========================
     async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         sm = self.s.state_manager
         params = sm.get_strategy_params()
 
         symbols = ", ".join(html.escape(s) for s in params["allowed_symbols"])
 
+        # MarketRegime 정보 추가
+        regime_str = "N/A"
+        if hasattr(sm, 'current_regime'):
+            regime_str = html.escape(sm.current_regime.value)
+        
+        sentiment_str = "N/A"
+        if hasattr(sm, 'current_sentiment'):
+            sentiment_str = html.escape(sm.current_sentiment)
+        
+        ai_signal_str = "N/A"
+        if hasattr(sm, 'current_ai_signal'):
+            ai_signal_str = html.escape(sm.current_ai_signal)
+        
+        regime_confidence = 0.5
+        if hasattr(sm, 'regime_confidence'):
+            regime_confidence = sm.regime_confidence
+
         output = (
             "<b>System Status</b>\n"
             f"{SEP}\n"
-            f"🔹 Market State: <code>{html.escape(sm.current_state)}</code>\n"
-            f"🔹 Description: {html.escape(params['description'])}\n"
-            f"🔹 Confidence: {sm.state_confidence:.1%}\n"
-            f"🔹 Active Symbols: {symbols}\n"
+            f"📍 <b>Market Indicators</b>\n"
+            f"• State: <code>{html.escape(sm.current_state)}</code>\n"
+            f"• Regime: <b>{regime_str}</b>\n"
+            f"• Sentiment: {sentiment_str}\n"
+            f"• AI Signal: {ai_signal_str}\n"
+            f"• Confidence: {regime_confidence:.1%}\n"
+            f"\n📋 <b>Strategy</b>\n"
+            f"• Description: {html.escape(params['description'])}\n"
+            f"• Active Symbols: {symbols}\n"
             f"\n<b>Trading Status</b>\n"
         )
 
@@ -62,14 +123,43 @@ class Commands:
 
     async def market_state(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await self.s.state_manager.update_state()
-        params = self.s.state_manager.get_strategy_params()
+        sm = self.s.state_manager
+        params = sm.get_strategy_params()
+        
+        # MarketRegime 정보 추가
+        regime_str = "N/A"
+        if hasattr(sm, 'current_regime'):
+            regime_str = html.escape(sm.current_regime.value)
+        
+        sentiment_str = "N/A"
+        if hasattr(sm, 'current_sentiment'):
+            sentiment_str = html.escape(sm.current_sentiment)
+        
+        ai_signal_str = "N/A"
+        if hasattr(sm, 'current_ai_signal'):
+            ai_signal_str = html.escape(sm.current_ai_signal)
+        
+        regime_confidence = 0.5
+        if hasattr(sm, 'regime_confidence'):
+            regime_confidence = sm.regime_confidence
+        
         output = (
             "<b>Current Market State</b>\n"
             f"{SEP}\n"
-            f"• State: <code>{html.escape(self.s.state_manager.current_state)}</code>\n"
+            f"🔹 <b>Core State</b>\n"
+            f"• State: <code>{html.escape(sm.current_state)}</code>\n"
+            f"• State Confidence: {sm.state_confidence:.1%}\n"
+            f"\n🔹 <b>Market Regime</b>\n"
+            f"• Regime: <b>{regime_str}</b>\n"
+            f"• Regime Confidence: {regime_confidence:.1%}\n"
+            f"\n🔹 <b>Market Signals</b>\n"
+            f"• Sentiment: {sentiment_str}\n"
+            f"• AI Signal: {ai_signal_str}\n"
+            f"\n🔹 <b>Strategy</b>\n"
             f"• Description: {html.escape(params['description'])}\n"
-            f"• Confidence: {self.s.state_manager.state_confidence:.1%}\n"
-            f"• Last Update: {html.escape(self.s.state_manager.last_update_time.strftime('%Y-%m-%d %H:%M:%S'))}\n"
+            f"• Amount Mult: {params.get('amount_multiplier', 0)}x\n"
+            f"• Interval: {params.get('interval_hours', 0)}h\n"
+            f"• Last Update: {html.escape(sm.last_update_time.strftime('%Y-%m-%d %H:%M:%S'))}\n"
         )
         await self._send_html(update, output)
 

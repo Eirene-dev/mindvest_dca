@@ -106,9 +106,9 @@ class DatabaseManager:
                 
                 with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
                     query = """
-                        SELECT overall_signal, market_condition, timestamp
+                        SELECT overall_signal, market_condition, created_at
                         FROM ai_comprehensive_analysis 
-                        ORDER BY timestamp DESC 
+                        ORDER BY created_at DESC 
                         LIMIT 1
                     """
                     cursor.execute(query)
