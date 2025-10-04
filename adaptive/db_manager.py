@@ -95,6 +95,41 @@ class DatabaseManager:
         logger.warning("Using default market state S4")
         return {'state': 'S4', 'confidence': 0.5, 'btc_price': 0}
     
+    def get_latest_ai_analysis(self):
+        """최신 AI 종합 분석 데이터 가져오기"""
+        for attempt in range(3):
+            try:
+                if not self.connection or self.connection.closed:
+                    if not self.reconnect():
+                        time.sleep(1)
+                        continue
+                
+                with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                    query = """
+                        SELECT overall_signal, market_condition, timestamp
+                        FROM ai_comprehensive_analysis 
+                        ORDER BY timestamp DESC 
+                        LIMIT 1
+                    """
+                    cursor.execute(query)
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        logger.info(f"Latest AI analysis - Signal: {result['overall_signal']}, Condition: {result['market_condition']}")
+                        return result
+                    else:
+                        logger.warning("No AI analysis data found in database")
+                        break
+                        
+            except Exception as e:
+                logger.error(f"Error fetching AI analysis data (attempt {attempt+1}): {e}")
+                if attempt < 2:
+                    time.sleep(1)
+                    self.reconnect()
+        
+        logger.warning("Returning None for AI analysis data")
+        return None
+    
     def get_state_history(self, hours=24):
         """시장 상태 히스토리 가져오기"""
         try:
