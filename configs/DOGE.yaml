@@ -1,11 +1,11 @@
 symbol: DOGE
 price_precision: 5
 volume_precision: 0
-open_amount: 360
-max_amount: 3600
+open_amount: 60
+max_amount: 1920
 direction: LONG
 take_profit_ratio: 3
-stop_loss_ratio: -50
+stop_loss_ratio: -20
 is_lao: false
-is_va: true
-increase_rate: 1
+is_va: false
+increase_rate: 1.3

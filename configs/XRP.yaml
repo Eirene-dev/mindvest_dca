@@ -1,11 +1,11 @@
 symbol: XRP
 price_precision: 4
 volume_precision: 0
-open_amount: 360
-max_amount: 3600
+open_amount: 80
+max_amount: 2400
 direction: LONG
-take_profit_ratio: 2.5
-stop_loss_ratio: -50
+take_profit_ratio: 3
+stop_loss_ratio: -20
 is_lao: false
 is_va: false
-increase_rate: 1
+increase_rate: 1.3

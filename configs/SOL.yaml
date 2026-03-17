@@ -1,11 +1,11 @@
 symbol: SOL
 price_precision: 3
 volume_precision: 2
-open_amount: 600
-max_amount: 6000
+open_amount: 160
+max_amount: 4800
 direction: LONG
-take_profit_ratio: 3
-stop_loss_ratio: -30
+take_profit_ratio: 4
+stop_loss_ratio: -15
 is_lao: false
 is_va: false
-increase_rate: 1.7
+increase_rate: 1.3

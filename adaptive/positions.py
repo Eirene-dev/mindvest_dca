@@ -1,4 +1,12 @@
-# adaptive/positions.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Position Management (Simplified)
+- 3-Mode 시스템: STOP/NORMAL/CAUTIOUS
+- TP/SL은 YAML 고정값
+- PositionAnalyzer는 알림 전용
+"""
+
 import time
 import logging
 from enum import Enum
@@ -6,8 +14,10 @@ from datetime import datetime
 from typing import Optional, Callable, Awaitable
 
 from adaptive.exchange import OrderManager, BinanceTrader
+from adaptive.policies import is_symbol_allowed
 
 logger = logging.getLogger('PosInfo')
+
 
 class PositionState(Enum):
     NoPos = 0
@@ -29,60 +39,63 @@ class PosInfo:
         self.analyzer = position_analyzer
         self.state_manager = state_manager
         self.send_message = send_message
-        self.logger = logger or logging.getLogger('AdaptiveTrader')
+        self.logger = logger or logging.getLogger('PosInfo')
 
-        self.last_update_time = time.time() - 3600
         self.position_amt = {'LONG': 0, 'SHORT': 0}
         self.entry_price = {'LONG': 0.0, 'SHORT': 100000.0}
-        self.pos_state = {'LONG': PositionState.NoPos, 'SHORT': PositionState.NoPos}
 
         try:
-            ticker = BinanceTrader.client.futures_symbol_ticker(symbol=symbol_config.symbol_binance)
+            ticker = BinanceTrader.client.futures_symbol_ticker(
+                symbol=symbol_config.symbol_binance
+            )
             self.price = float(ticker['price'])
         except Exception:
             self.price = 0.0
 
-        self.open_price = self.price
-        self.close_price = self.price
         self.leftover = 0
         self.va_target_amount = symbol_config.open_amount
         self.sl_alert_sent = False
 
-        # 초기 히스토리컬 데이터 로드
+        # 히스토리컬 데이터 로드
         self.load_initial_history()
 
+    # ---------------------------
+    # 초기 데이터
+    # ---------------------------
     def load_initial_history(self):
         """다층 시간대 히스토리컬 데이터 로드"""
         try:
-            # 1) 1D
-            daily_klines = BinanceTrader.client.futures_klines(
+            daily = BinanceTrader.client.futures_klines(
                 symbol=self.symbol_config.symbol_binance, interval='1d', limit=200
             )
-            # 2) 4H
-            four_hour_klines = BinanceTrader.client.futures_klines(
+            four_hour = BinanceTrader.client.futures_klines(
                 symbol=self.symbol_config.symbol_binance, interval='4h', limit=180
             )
-            # 3) 1H
-            hourly_klines = BinanceTrader.client.futures_klines(
+            hourly = BinanceTrader.client.futures_klines(
                 symbol=self.symbol_config.symbol_binance, interval='1h', limit=168
             )
 
             processed = []
-            for k in daily_klines[:-7]:
-                processed.append({'price': float(k[4]), 'volume': float(k[7]), 'weight': 0.5})
-            for k in four_hour_klines[-42:]:
-                processed.append({'price': float(k[4]), 'volume': float(k[7]), 'weight': 0.8})
-            for k in hourly_klines:
-                processed.append({'price': float(k[4]), 'volume': float(k[7]), 'weight': 1.0})
+            for k in daily[:-7]:
+                processed.append((float(k[4]), float(k[7])))
+            for k in four_hour[-42:]:
+                processed.append((float(k[4]), float(k[7])))
+            for k in hourly:
+                processed.append((float(k[4]), float(k[7])))
 
-            for d in processed:
-                self.analyzer.update_history(self.symbol_config.symbol, d['price'], d['volume'])
+            for price, volume in processed:
+                self.analyzer.update_history(self.symbol_config.symbol, price, volume)
 
-            self.logger.info(f"Loaded {len(processed)} data points for {self.symbol_config.symbol}")
+            self.logger.info(
+                f"Loaded {len(processed)} data points for {self.symbol_config.symbol}"
+            )
         except Exception as e:
-            self.logger.error(f"Failed to load historical data: {e}")
+            self.logger.error(f"Failed to load historical data for {self.symbol_config.symbol}: {e}")
 
-    def current_price(self):
+    # ---------------------------
+    # 가격/포지션 업데이트
+    # ---------------------------
+    def current_price(self) -> float:
         try:
             info = OrderManager.broker.fetch_ticker(self.symbol_config.symbol_binance)
             price = float(info['last'])
@@ -95,214 +108,270 @@ class PosInfo:
         return price
 
     def update(self, client=None):
-        """Binance 포지션 정보 갱신 (client 미전달 시 내부 client 사용)"""
+        """Binance 포지션 정보 갱신"""
         try:
             client = client or BinanceTrader.client
-            info = client.futures_position_information(symbol=self.symbol_config.symbol_binance)
+            info = client.futures_position_information(
+                symbol=self.symbol_config.symbol_binance
+            )
             for item in info:
                 if item.get('positionSide') == 'BOTH':
                     continue
                 self.position_amt[item['positionSide']] = abs(float(item['positionAmt']))
                 self.entry_price[item['positionSide']] = float(item['entryPrice'])
         except Exception as e:
-            self.logger.error(e)
+            self.logger.error(f"Position update error: {e}")
             BinanceTrader.reconnect()
 
-    # =========================
-    # Trading (원본 로직 유지)
-    # =========================
+    # ---------------------------
+    # 트레이딩 (단순화)
+    # ---------------------------
     async def trade(self):
-        """적응형 트레이드 (전략은 YAML 설정 따름)"""
-        state_params = self.state_manager.get_strategy_params()
+        """
+        3-Mode 기반 트레이딩
+        - STOP 모드: 매수 안 함
+        - CAUTIOUS 모드: 허용 심볼만, 0.3x 매수
+        - NORMAL 모드: YAML 설정 그대로
+        """
+        cfg = self.symbol_config
+        symbol = cfg.symbol
 
-        # 자산 위치 분석
-        position_score = self.analyzer.get_position_score(self.symbol_config.symbol)
-
-        # 시장 상태 + 자산 위치로 파라미터 조정
-        if not self.symbol_config.apply_market_state_and_position(state_params, position_score):
-            self.logger.info(f"[{self.symbol_config.symbol}] Trading disabled")
+        # 수동 정지 체크
+        if cfg.stop_trade:
             return
 
-        # 전략 선택
-        if self.symbol_config.is_va:
-            await self.trade_va()
+        # 심볼 허용 여부 체크
+        if not is_symbol_allowed(self.state_manager.current_state, symbol):
+            # 허용 안 됨 → 기존 포지션 TP/SL만 체크
+            if self.position_amt['LONG'] > 0:
+                await self._check_tp_sl()
+            return
+
+        # 매수 배수 계산
+        mode_params = self.state_manager.mode_params
+        amount_mult = mode_params['amount_multiplier']
+
+        if amount_mult <= 0:
+            # STOP 모드: TP/SL만 체크
+            if self.position_amt['LONG'] > 0:
+                await self._check_tp_sl()
+            return
+
+        # 실제 매수량 = base × multiplier
+        effective_amount = cfg.open_amount * amount_mult
+
+        # 전략 실행
+        if cfg.is_va:
+            await self._trade_va(effective_amount)
         else:
-            await self.trade_dca()
+            await self._trade_dca(effective_amount)
 
-    async def trade_dca(self):
-        if self.symbol_config.direction == 'LONG':
-            await self.trade_long()
-        elif self.symbol_config.direction == 'SHORT':
-            await self.trade_short()
+    # ---------------------------
+    # DCA 전략
+    # ---------------------------
+    async def _trade_dca(self, effective_amount: float):
+        cfg = self.symbol_config
+        if cfg.direction == 'LONG':
+            await self._trade_long_dca(effective_amount)
 
-    async def trade_long(self):
+    async def _trade_long_dca(self, effective_amount: float):
+        cfg = self.symbol_config
         price = self.current_price()
-        entry_price = self.entry_price['LONG']
+        entry = self.entry_price['LONG']
         pos = self.position_amt['LONG']
 
-        profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
-        tp_ratio = self.symbol_config.take_profit_ratio
-        sl_ratio = self.symbol_config.stop_loss_ratio
-        total_buy_amount = pos * entry_price + self.symbol_config.open_amount if entry_price > 0 else self.symbol_config.open_amount
-        max_amount = self.symbol_config.max_amount
+        profit_ratio = ((price - entry) / entry * 100) if entry > 0 else 0
+        tp = cfg.take_profit_ratio
+        sl = cfg.stop_loss_ratio
+        current_value = pos * entry if entry > 0 else 0
+        max_amount = cfg.max_amount
 
-        logger.info(f'{datetime.now()} {self.symbol_config.symbol}, Profit: {profit_ratio:0,.2f}%, Target: {tp_ratio:0,.2f}%, Buy: {total_buy_amount:0,.2f}, Max: ${max_amount}, Reduce: {self.symbol_config.reduce_only}')
+        self.logger.info(
+            f'[{cfg.symbol}] Price: ${price:,.2f}, Profit: {profit_ratio:.2f}%, '
+            f'Value: ${current_value:,.0f}, Max: ${max_amount:,.0f}'
+        )
 
-        # 손절선 회복 시 알림 플래그 해제
-        if self.sl_alert_sent and pos > 0 and profit_ratio > sl_ratio + 2:
+        # SL 회복 시 알림 해제
+        if self.sl_alert_sent and pos > 0 and profit_ratio > sl + 2:
             self.sl_alert_sent = False
-        
-        # 익절
-        if pos > 0 and profit_ratio >= tp_ratio:
-            pos_to_sell = pos
-            if self.symbol_config.is_lao and pos > self.symbol_config.open_amount * 4:
-                pos_to_sell = max(1, pos / 2)
-            OrderManager.sell_market(self.symbol_config, round(price, self.symbol_config.price_precision), round(pos_to_sell, self.symbol_config.volume_precision))
-            msg = '**[{}][TP] Close Long: Profit {:0,.2f}% ({:0,.2f}%)'.format(self.symbol_config.symbol, profit_ratio, tp_ratio)
+
+        # 1. 익절
+        if pos > 0 and profit_ratio >= tp:
+            sell_pos = pos
+            if cfg.is_lao and pos > effective_amount * 4:
+                sell_pos = max(1, pos / 2)
+
+            OrderManager.sell_market(
+                cfg,
+                round(price, cfg.price_precision),
+                round(sell_pos, cfg.volume_precision),
+            )
+            msg = f'✅ [{cfg.symbol}][TP] Profit {profit_ratio:.2f}% (target {tp:.1f}%)'
             await self.send_message(msg)
             self.leftover = 0
+            return
 
-        # 손절 알림
-        elif pos > 0 and profit_ratio <= sl_ratio:
-            if not hasattr(self, 'sl_alert_sent') or not self.sl_alert_sent:
-                current_value = pos * price
-                loss_amount = current_value - (pos * entry_price)
-                msg = f"""
-🚨 **STOP LOSS ALERT** 🚨
-━━━━━━━━━━━━━━━━
-Symbol: {self.symbol_config.symbol}
-Current Price: ${price:,.2f}
-Entry Price: ${entry_price:,.2f}
-Loss: {profit_ratio:.2f}% (Trigger: {sl_ratio:.2f}%)
-Position Value: ${current_value:,.2f}
-Loss Amount: ${loss_amount:,.2f}
-━━━━━━━━━━━━━━━━
-⚠️ **Manual action required!**
-/close_position {self.symbol_config.symbol} 또는 /ignore_sl {self.symbol_config.symbol}
-"""
+        # 2. 손절 알림 (자동 매도 안 함)
+        if pos > 0 and profit_ratio <= sl:
+            await self._send_sl_alert(price, entry, pos, profit_ratio, sl)
+            return
+
+        # 3. 신규 매수
+        if current_value + effective_amount < max_amount and effective_amount >= 10:
+            buy_amount = effective_amount
+            if cfg.is_lao and profit_ratio >= 0:
+                buy_amount /= 2
+
+            self.leftover += buy_amount
+            buy_volume = round(self.leftover / price, cfg.volume_precision)
+
+            if buy_volume > 0:
+                OrderManager.buy_market(
+                    cfg,
+                    round(price, cfg.price_precision),
+                    buy_volume,
+                )
+                msg = (
+                    f'[{cfg.symbol}] Buy ${buy_volume * price:,.0f} at ${price:,.2f}, '
+                    f'Total ${(pos * price + buy_volume * price):,.0f}'
+                )
                 await self.send_message(msg)
-                self.sl_alert_sent = True
-                self.logger.warning(f"[{self.symbol_config.symbol}] Stop loss triggered but not executed - Alert sent")
+                self.leftover -= buy_volume * price
+            else:
+                self.leftover = 0
 
-        # 신규 매수
-        elif total_buy_amount < max_amount and not self.symbol_config.reduce_only:
-            buy_amount = self.symbol_config.open_amount
-            
-            if buy_amount > 0:
-                if self.symbol_config.is_lao and profit_ratio >= 0:
-                    buy_amount /= 2
-                self.leftover += buy_amount
-                buy_volume = round(self.leftover / price, self.symbol_config.volume_precision)
-
-                if buy_volume > 0:
-                    OrderManager.buy_market(self.symbol_config, round(price, self.symbol_config.price_precision), buy_volume)
-                    msg = '[{}] Open Price {}, Qty ${:0,.0f}+{:0,.0f}, Profit {:0,.2f}%'.format(
-                        self.symbol_config.symbol, price, buy_volume * price, self.position_amt['LONG'] * price, profit_ratio)
-                    await self.send_message(msg)
-
-                self.leftover -= buy_volume * price if buy_volume > 0 else 0
-
-        else:
-            if self.symbol_config.reduce_only and pos == 0:
-                return
+        elif current_value >= max_amount:
             self.leftover = 0
-            if total_buy_amount >= max_amount:
-                msg = '**[{}][Max] Current ${:0,.2f} (Max ${:0,.2f})'.format(
-                    self.symbol_config.symbol, pos * entry_price if entry_price > 0 else 0, max_amount)
-                await self.send_message(msg)
 
-    async def trade_short(self):
-        """DCA Short (미구현)"""
-        pass
+    # ---------------------------
+    # VA 전략
+    # ---------------------------
+    async def _trade_va(self, effective_amount: float):
+        cfg = self.symbol_config
+        if cfg.direction == 'LONG':
+            await self._trade_long_va(effective_amount)
 
-    async def trade_va(self):
-        if self.symbol_config.direction == 'LONG':
-            await self.trade_long_va()
-        elif self.symbol_config.direction == 'SHORT':
-            await self.trade_short_va()
-
-    async def trade_long_va(self):
+    async def _trade_long_va(self, effective_amount: float):
+        cfg = self.symbol_config
         price = self.current_price()
         pos = self.position_amt['LONG']
-        entry_price = self.entry_price['LONG']
+        entry = self.entry_price['LONG']
 
-        self.logger.info(f"[VA] {self.symbol_config.symbol} OpenAmount: {self.symbol_config.open_amount}, Target Amount: {self.va_target_amount}")
-        self.logger.info(f"Target Amount: {self.va_target_amount}")
-
-        current_asset_value = pos * price
+        current_value = pos * price
         if pos <= 0:
-            self.va_target_amount = self.symbol_config.open_amount
-            self.logger.info(f"POS=0, Target Amount: {self.va_target_amount}")
+            self.va_target_amount = effective_amount
 
-        difference = self.va_target_amount - current_asset_value
-        profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
-        tp_ratio = self.symbol_config.take_profit_ratio
-        sl_ratio = self.symbol_config.stop_loss_ratio
+        difference = self.va_target_amount - current_value
+        profit_ratio = ((price - entry) / entry * 100) if entry > 0 else 0
+        tp = cfg.take_profit_ratio
+        sl = cfg.stop_loss_ratio
 
-        self.logger.info(f"Difference: {difference:.0f}")
+        self.logger.info(
+            f'[VA][{cfg.symbol}] Target: ${self.va_target_amount:,.0f}, '
+            f'Current: ${current_value:,.0f}, Diff: ${difference:,.0f}'
+        )
 
-        # 손절선 회복 시 알림 플래그 해제
-        if self.sl_alert_sent and pos > 0 and profit_ratio > sl_ratio + 2:
+        # SL 회복 시 알림 해제
+        if self.sl_alert_sent and pos > 0 and profit_ratio > sl + 2:
             self.sl_alert_sent = False
 
-        # 익절
-        if pos > 0 and profit_ratio >= tp_ratio:
-            OrderManager.sell_market(self.symbol_config, round(price, self.symbol_config.price_precision), round(pos, self.symbol_config.volume_precision))
-            self.va_target_amount = self.symbol_config.open_amount
-            msg = f'**[{self.symbol_config.symbol}][TP] VA Close: Profit {profit_ratio:.2f}%'
+        # 1. 익절
+        if pos > 0 and profit_ratio >= tp:
+            OrderManager.sell_market(
+                cfg,
+                round(price, cfg.price_precision),
+                round(pos, cfg.volume_precision),
+            )
+            self.va_target_amount = effective_amount
+            msg = f'✅ [{cfg.symbol}][VA][TP] Profit {profit_ratio:.2f}%'
             await self.send_message(msg)
-
-        # 손절 알림 (자동 매도하지 않고 알림만)
-        elif pos > 0 and profit_ratio <= sl_ratio:
-            if not hasattr(self, 'sl_alert_sent') or not self.sl_alert_sent:
-                current_value = pos * price
-                loss_amount = current_value - (pos * entry_price)
-                msg = f"""
-    🚨 **STOP LOSS ALERT** 🚨
-    ━━━━━━━━━━━━━━━━
-    Symbol: {self.symbol_config.symbol} (VA)
-    Current Price: ${price:,.2f}
-    Entry Price: ${entry_price:,.2f}
-    Loss: {profit_ratio:.2f}% (Trigger: {sl_ratio:.2f}%)
-    Position Value: ${current_value:,.2f}
-    Loss Amount: ${loss_amount:,.2f}
-    Target Amount: ${self.va_target_amount:,.2f}
-    ━━━━━━━━━━━━━━━━
-    ⚠️ **Manual action required!**
-    /close_position {self.symbol_config.symbol} 또는 /ignore_sl {self.symbol_config.symbol}
-    """
-                await self.send_message(msg)
-                self.sl_alert_sent = True
-                self.logger.warning(f"[{self.symbol_config.symbol}] VA Stop loss triggered but not executed - Alert sent")
-            return  # 손절 상태에서는 추가 매매 중단
-
-        # reduce_only 모드면 추가 매수 안함
-        if self.symbol_config.reduce_only:
             return
 
-        # VA 리밸런싱 (손절 상태가 아닐 때만 실행)
-        if difference > 0 and current_asset_value + difference <= self.symbol_config.max_amount:
-            buy_volume = round(difference / price, self.symbol_config.volume_precision)
-            self.logger.info(f"buy_volume: {buy_volume}")
+        # 2. 손절 알림
+        if pos > 0 and profit_ratio <= sl:
+            await self._send_sl_alert(price, entry, pos, profit_ratio, sl)
+            return
+
+        # 3. VA 리밸런싱
+        if difference > 0 and current_value + difference <= cfg.max_amount:
+            buy_volume = round(difference / price, cfg.volume_precision)
             if buy_volume > 0 and abs(difference) > 80:
-                OrderManager.buy_market(self.symbol_config, round(price, self.symbol_config.price_precision), buy_volume)
-                msg = f'[{self.symbol_config.symbol}] VA Buy: ${difference:.0f} at {price}'
+                OrderManager.buy_market(
+                    cfg,
+                    round(price, cfg.price_precision),
+                    buy_volume,
+                )
+                msg = f'[{cfg.symbol}][VA] Buy ${difference:,.0f} at ${price:,.2f}'
                 await self.send_message(msg)
         elif difference < 0 and abs(difference) > 80:
-            sell_volume = round(-difference / price, self.symbol_config.volume_precision)
-            sell_volume = min(sell_volume, pos)
-            self.logger.info(f"sell_volume: {sell_volume}")
+            sell_volume = min(
+                round(-difference / price, cfg.volume_precision),
+                pos,
+            )
             if sell_volume > 0:
-                OrderManager.sell_market(self.symbol_config, round(price, self.symbol_config.price_precision), sell_volume)
-                msg = f'[{self.symbol_config.symbol}] VA Sell: ${-difference:.0f} at {price}'
+                OrderManager.sell_market(
+                    cfg,
+                    round(price, cfg.price_precision),
+                    sell_volume,
+                )
+                msg = f'[{cfg.symbol}][VA] Sell ${-difference:,.0f} at ${price:,.2f}'
                 await self.send_message(msg)
-        else:
-            self.logger.info(f"difference: {difference:.0f}, current_asset_value: {current_asset_value}, max: {self.symbol_config.max_amount}")
 
-        # 타겟 증가 (손절 상태가 아닐 때만)
-        if current_asset_value + difference <= self.symbol_config.max_amount:
-            self.va_target_amount *= (1 + self.symbol_config.increase_rate / 100.0)
+        # 타겟 증가
+        if current_value + difference <= cfg.max_amount:
+            self.va_target_amount *= (1 + cfg.increase_rate / 100.0)
 
-    async def trade_short_va(self):
-        """VA Short (미구현)"""
-        pass
+    # ---------------------------
+    # 공통 유틸
+    # ---------------------------
+    async def _check_tp_sl(self):
+        """STOP/비허용 모드에서도 기존 포지션의 TP/SL은 체크"""
+        cfg = self.symbol_config
+        price = self.current_price()
+        entry = self.entry_price['LONG']
+        pos = self.position_amt['LONG']
+
+        if pos <= 0 or entry <= 0:
+            return
+
+        profit_ratio = ((price - entry) / entry * 100)
+
+        # 익절
+        if profit_ratio >= cfg.take_profit_ratio:
+            OrderManager.sell_market(
+                cfg,
+                round(price, cfg.price_precision),
+                round(pos, cfg.volume_precision),
+            )
+            msg = f'✅ [{cfg.symbol}][TP] Profit {profit_ratio:.2f}% (in STOP mode)'
+            await self.send_message(msg)
+
+        # 손절 알림
+        elif profit_ratio <= cfg.stop_loss_ratio:
+            await self._send_sl_alert(price, entry, pos, profit_ratio, cfg.stop_loss_ratio)
+
+    async def _send_sl_alert(
+        self, price: float, entry: float, pos: float,
+        profit_ratio: float, sl_ratio: float,
+    ):
+        """손절 알림 (자동 매도 안 함)"""
+        if self.sl_alert_sent:
+            return
+
+        cfg = self.symbol_config
+        current_value = pos * price
+        loss_amount = current_value - (pos * entry)
+
+        msg = (
+            f"🚨 <b>STOP LOSS ALERT</b> 🚨\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"Symbol: {cfg.symbol}\n"
+            f"Price: ${price:,.2f} (Entry: ${entry:,.2f})\n"
+            f"Loss: {profit_ratio:.2f}% (Trigger: {sl_ratio:.1f}%)\n"
+            f"Value: ${current_value:,.2f} (Loss: ${loss_amount:,.2f})\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"⚠️ /close_position {cfg.symbol} 또는 /ignore_sl {cfg.symbol}"
+        )
+        await self.send_message(msg)
+        self.sl_alert_sent = True
+        self.logger.warning(f"[{cfg.symbol}] SL alert sent at {profit_ratio:.2f}%")

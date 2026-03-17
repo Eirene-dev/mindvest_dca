@@ -1,11 +1,11 @@
 symbol: ETH
 price_precision: 2
 volume_precision: 3
-open_amount: 1200
-max_amount: 7200
+open_amount: 240
+max_amount: 6400
 direction: LONG
 take_profit_ratio: 5
-stop_loss_ratio: -30
+stop_loss_ratio: -15
 is_lao: false
 is_va: false
 increase_rate: 1.3
