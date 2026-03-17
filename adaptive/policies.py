@@ -170,35 +170,86 @@ STATE_STRATEGY_MATRIX: Dict[str, Dict[str, Any]] = {
 # 2D Position Adjustment Matrix (max_mult 추가)
 # ==========================================
 
+# POSITION_ADJUSTMENT_MATRIX: Dict[Tuple[str, str], Dict[str, float]] = {
+#     # S6 (Strong Bull)
+#     ('S6', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.1, 'max_mult': 0.3, 'tp_mult': 0.5, 'sl_mult': 2.0},
+#     ('S6', 'STRONG_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.5, 'tp_mult': 0.6, 'sl_mult': 1.5},
+#     ('S6', 'NEAR_RESISTANCE'): {'amount_mult': 0.5, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.2},
+#     ('S6', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
+#     ('S6', 'NEAR_SUPPORT'): {'amount_mult': 1.3, 'max_mult': 1.2, 'tp_mult': 1.2, 'sl_mult': 0.8},
+#     ('S6', 'STRONG_SUPPORT'): {'amount_mult': 1.5, 'max_mult': 1.5, 'tp_mult': 1.3, 'sl_mult': 0.7},
+#     ('S6', 'EXTREME_OVERSOLD'): {'amount_mult': 2.0, 'max_mult': 1.3, 'tp_mult': 1.5, 'sl_mult': 0.6},
+
+#     # S5 (Early Bull)
+#     ('S5', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.2, 'max_mult': 0.4, 'tp_mult': 0.5, 'sl_mult': 1.8},
+#     ('S5', 'STRONG_RESISTANCE'): {'amount_mult': 0.4, 'max_mult': 0.6, 'tp_mult': 0.7, 'sl_mult': 1.4},
+#     ('S5', 'NEAR_RESISTANCE'): {'amount_mult': 0.7, 'max_mult': 0.8, 'tp_mult': 0.9, 'sl_mult': 1.1},
+#     ('S5', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
+#     ('S5', 'NEAR_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.2, 'tp_mult': 1.1, 'sl_mult': 0.9},
+#     ('S5', 'STRONG_SUPPORT'): {'amount_mult': 1.4, 'max_mult': 1.4, 'tp_mult': 1.2, 'sl_mult': 0.8},
+#     ('S5', 'EXTREME_OVERSOLD'): {'amount_mult': 1.6, 'max_mult': 1.3, 'tp_mult': 1.3, 'sl_mult': 0.7},
+
+#     # S4 (Neutral)
+#     ('S4', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.2, 'tp_mult': 0.4, 'sl_mult': 2.0},
+#     ('S4', 'STRONG_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.4, 'tp_mult': 0.6, 'sl_mult': 1.5},
+#     ('S4', 'NEAR_RESISTANCE'): {'amount_mult': 0.6, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.2},
+#     ('S4', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
+#     ('S4', 'NEAR_SUPPORT'): {'amount_mult': 1.1, 'max_mult': 1.1, 'tp_mult': 1.1, 'sl_mult': 0.9},
+#     ('S4', 'STRONG_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.3, 'tp_mult': 1.2, 'sl_mult': 0.8},
+#     ('S4', 'EXTREME_OVERSOLD'): {'amount_mult': 1.3, 'max_mult': 1.2, 'tp_mult': 1.3, 'sl_mult': 0.7},
+
+#     # S3 (Consolidation Low)
+#     ('S3', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.1, 'tp_mult': 0.3, 'sl_mult': 3.0},
+#     ('S3', 'STRONG_RESISTANCE'): {'amount_mult': 0.1, 'max_mult': 0.2, 'tp_mult': 0.5, 'sl_mult': 2.0},
+#     ('S3', 'NEAR_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.4, 'tp_mult': 0.7, 'sl_mult': 1.5},
+#     ('S3', 'NEUTRAL'): {'amount_mult': 0.7, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
+#     ('S3', 'NEAR_SUPPORT'): {'amount_mult': 1.0, 'max_mult': 1.2, 'tp_mult': 1.2, 'sl_mult': 0.8},
+#     ('S3', 'STRONG_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.5, 'tp_mult': 1.3, 'sl_mult': 0.7},
+#     ('S3', 'EXTREME_OVERSOLD'): {'amount_mult': 1.3, 'max_mult': 1.3, 'tp_mult': 1.4, 'sl_mult': 0.6},
+
+#     # 기본값
+#     ('DEFAULT', 'DEFAULT'): {'amount_mult': 0.5, 'max_mult': 0.5, 'tp_mult': 1.0, 'sl_mult': 1.0},
+# }
+# ==========================================
+# 2D Position Adjustment Matrix (완전판)
+# ==========================================
+
 POSITION_ADJUSTMENT_MATRIX: Dict[Tuple[str, str], Dict[str, float]] = {
-    # S6 (Strong Bull)
-    ('S6', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.1, 'max_mult': 0.3, 'tp_mult': 0.5, 'sl_mult': 2.0},
-    ('S6', 'STRONG_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.5, 'tp_mult': 0.6, 'sl_mult': 1.5},
-    ('S6', 'NEAR_RESISTANCE'): {'amount_mult': 0.5, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.2},
-    ('S6', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
-    ('S6', 'NEAR_SUPPORT'): {'amount_mult': 1.3, 'max_mult': 1.2, 'tp_mult': 1.2, 'sl_mult': 0.8},
-    ('S6', 'STRONG_SUPPORT'): {'amount_mult': 1.5, 'max_mult': 1.5, 'tp_mult': 1.3, 'sl_mult': 0.7},
-    ('S6', 'EXTREME_OVERSOLD'): {'amount_mult': 2.0, 'max_mult': 1.3, 'tp_mult': 1.5, 'sl_mult': 0.6},
-
-    # S5 (Early Bull)
-    ('S5', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.2, 'max_mult': 0.4, 'tp_mult': 0.5, 'sl_mult': 1.8},
-    ('S5', 'STRONG_RESISTANCE'): {'amount_mult': 0.4, 'max_mult': 0.6, 'tp_mult': 0.7, 'sl_mult': 1.4},
-    ('S5', 'NEAR_RESISTANCE'): {'amount_mult': 0.7, 'max_mult': 0.8, 'tp_mult': 0.9, 'sl_mult': 1.1},
-    ('S5', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
-    ('S5', 'NEAR_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.2, 'tp_mult': 1.1, 'sl_mult': 0.9},
-    ('S5', 'STRONG_SUPPORT'): {'amount_mult': 1.4, 'max_mult': 1.4, 'tp_mult': 1.2, 'sl_mult': 0.8},
-    ('S5', 'EXTREME_OVERSOLD'): {'amount_mult': 1.6, 'max_mult': 1.3, 'tp_mult': 1.3, 'sl_mult': 0.7},
-
-    # S4 (Neutral)
-    ('S4', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.2, 'tp_mult': 0.4, 'sl_mult': 2.0},
-    ('S4', 'STRONG_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.4, 'tp_mult': 0.6, 'sl_mult': 1.5},
-    ('S4', 'NEAR_RESISTANCE'): {'amount_mult': 0.6, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.2},
-    ('S4', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
-    ('S4', 'NEAR_SUPPORT'): {'amount_mult': 1.1, 'max_mult': 1.1, 'tp_mult': 1.1, 'sl_mult': 0.9},
-    ('S4', 'STRONG_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.3, 'tp_mult': 1.2, 'sl_mult': 0.8},
-    ('S4', 'EXTREME_OVERSOLD'): {'amount_mult': 1.3, 'max_mult': 1.2, 'tp_mult': 1.3, 'sl_mult': 0.7},
-
-    # S3 (Consolidation Low)
+    
+    # ========== S0 (Market Crash) - 거래 중단 ==========
+    ('S0', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'STRONG_RESISTANCE'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'NEAR_RESISTANCE'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'NEUTRAL'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'NEAR_SUPPORT'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'STRONG_SUPPORT'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'EXTREME_OVERSOLD'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'BULLISH_MOMENTUM'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S0', 'BEARISH_MOMENTUM'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    
+    # ========== S1 (Extreme Bearish) - 거래 중단 ==========
+    ('S1', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.4, 'sl_mult': 2.5},
+    ('S1', 'STRONG_RESISTANCE'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.4, 'sl_mult': 2.5},
+    ('S1', 'NEAR_RESISTANCE'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.4, 'sl_mult': 2.5},
+    ('S1', 'NEUTRAL'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    ('S1', 'NEAR_SUPPORT'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    ('S1', 'STRONG_SUPPORT'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.6, 'sl_mult': 1.5},
+    ('S1', 'EXTREME_OVERSOLD'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.7, 'sl_mult': 1.0},
+    ('S1', 'BULLISH_MOMENTUM'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    ('S1', 'BEARISH_MOMENTUM'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.4, 'sl_mult': 2.5},
+    
+    # ========== S2 (Bearish) - 거래 중단 ==========
+    ('S2', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.4, 'sl_mult': 2.5},
+    ('S2', 'STRONG_RESISTANCE'): {'amount_mult': 0.0, 'max_mult': 0.0, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    ('S2', 'NEAR_RESISTANCE'): {'amount_mult': 0.0, 'max_mult': 0.1, 'tp_mult': 0.6, 'sl_mult': 1.8},
+    ('S2', 'NEUTRAL'): {'amount_mult': 0.0, 'max_mult': 0.2, 'tp_mult': 0.7, 'sl_mult': 1.5},
+    ('S2', 'NEAR_SUPPORT'): {'amount_mult': 0.0, 'max_mult': 0.3, 'tp_mult': 0.8, 'sl_mult': 1.2},
+    ('S2', 'STRONG_SUPPORT'): {'amount_mult': 0.0, 'max_mult': 0.4, 'tp_mult': 0.9, 'sl_mult': 1.0},
+    ('S2', 'EXTREME_OVERSOLD'): {'amount_mult': 0.0, 'max_mult': 0.5, 'tp_mult': 1.0, 'sl_mult': 0.8},
+    ('S2', 'BULLISH_MOMENTUM'): {'amount_mult': 0.0, 'max_mult': 0.3, 'tp_mult': 0.8, 'sl_mult': 1.3},
+    ('S2', 'BEARISH_MOMENTUM'): {'amount_mult': 0.0, 'max_mult': 0.1, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    
+    # ========== S3 (Consolidation Low) - 보수적 거래 ==========
     ('S3', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.1, 'tp_mult': 0.3, 'sl_mult': 3.0},
     ('S3', 'STRONG_RESISTANCE'): {'amount_mult': 0.1, 'max_mult': 0.2, 'tp_mult': 0.5, 'sl_mult': 2.0},
     ('S3', 'NEAR_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.4, 'tp_mult': 0.7, 'sl_mult': 1.5},
@@ -206,8 +257,65 @@ POSITION_ADJUSTMENT_MATRIX: Dict[Tuple[str, str], Dict[str, float]] = {
     ('S3', 'NEAR_SUPPORT'): {'amount_mult': 1.0, 'max_mult': 1.2, 'tp_mult': 1.2, 'sl_mult': 0.8},
     ('S3', 'STRONG_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.5, 'tp_mult': 1.3, 'sl_mult': 0.7},
     ('S3', 'EXTREME_OVERSOLD'): {'amount_mult': 1.3, 'max_mult': 1.3, 'tp_mult': 1.4, 'sl_mult': 0.6},
-
-    # 기본값
+    ('S3', 'BULLISH_MOMENTUM'): {'amount_mult': 0.8, 'max_mult': 1.0, 'tp_mult': 1.1, 'sl_mult': 0.9},
+    ('S3', 'BEARISH_MOMENTUM'): {'amount_mult': 0.5, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.3},
+    
+    # ========== S4 (Neutral) - 표준 거래 ==========
+    ('S4', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.2, 'tp_mult': 0.4, 'sl_mult': 2.0},
+    ('S4', 'STRONG_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.4, 'tp_mult': 0.6, 'sl_mult': 1.5},
+    ('S4', 'NEAR_RESISTANCE'): {'amount_mult': 0.6, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.2},
+    ('S4', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
+    ('S4', 'NEAR_SUPPORT'): {'amount_mult': 1.1, 'max_mult': 1.1, 'tp_mult': 1.1, 'sl_mult': 0.9},
+    ('S4', 'STRONG_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.3, 'tp_mult': 1.2, 'sl_mult': 0.8},
+    ('S4', 'EXTREME_OVERSOLD'): {'amount_mult': 1.3, 'max_mult': 1.2, 'tp_mult': 1.3, 'sl_mult': 0.7},
+    ('S4', 'BULLISH_MOMENTUM'): {'amount_mult': 1.1, 'max_mult': 1.0, 'tp_mult': 1.1, 'sl_mult': 0.9},
+    ('S4', 'BEARISH_MOMENTUM'): {'amount_mult': 0.8, 'max_mult': 0.8, 'tp_mult': 0.9, 'sl_mult': 1.2},
+    
+    # ========== S5 (Early Bull) - 적극적 거래 ==========
+    ('S5', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.2, 'max_mult': 0.4, 'tp_mult': 0.5, 'sl_mult': 1.8},
+    ('S5', 'STRONG_RESISTANCE'): {'amount_mult': 0.4, 'max_mult': 0.6, 'tp_mult': 0.7, 'sl_mult': 1.4},
+    ('S5', 'NEAR_RESISTANCE'): {'amount_mult': 0.7, 'max_mult': 0.8, 'tp_mult': 0.9, 'sl_mult': 1.1},
+    ('S5', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
+    ('S5', 'NEAR_SUPPORT'): {'amount_mult': 1.2, 'max_mult': 1.2, 'tp_mult': 1.1, 'sl_mult': 0.9},
+    ('S5', 'STRONG_SUPPORT'): {'amount_mult': 1.4, 'max_mult': 1.4, 'tp_mult': 1.2, 'sl_mult': 0.8},
+    ('S5', 'EXTREME_OVERSOLD'): {'amount_mult': 1.6, 'max_mult': 1.3, 'tp_mult': 1.3, 'sl_mult': 0.7},
+    ('S5', 'BULLISH_MOMENTUM'): {'amount_mult': 1.2, 'max_mult': 1.1, 'tp_mult': 1.2, 'sl_mult': 0.9},
+    ('S5', 'BEARISH_MOMENTUM'): {'amount_mult': 0.6, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.3},
+    
+    # ========== S6 (Strong Bull) - 최대 공격적 ==========
+    ('S6', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.1, 'max_mult': 0.3, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    ('S6', 'STRONG_RESISTANCE'): {'amount_mult': 0.3, 'max_mult': 0.5, 'tp_mult': 0.6, 'sl_mult': 1.5},
+    ('S6', 'NEAR_RESISTANCE'): {'amount_mult': 0.5, 'max_mult': 0.7, 'tp_mult': 0.8, 'sl_mult': 1.2},
+    ('S6', 'NEUTRAL'): {'amount_mult': 1.0, 'max_mult': 1.0, 'tp_mult': 1.0, 'sl_mult': 1.0},
+    ('S6', 'NEAR_SUPPORT'): {'amount_mult': 1.3, 'max_mult': 1.2, 'tp_mult': 1.2, 'sl_mult': 0.8},
+    ('S6', 'STRONG_SUPPORT'): {'amount_mult': 1.5, 'max_mult': 1.5, 'tp_mult': 1.3, 'sl_mult': 0.7},
+    ('S6', 'EXTREME_OVERSOLD'): {'amount_mult': 2.0, 'max_mult': 1.3, 'tp_mult': 1.5, 'sl_mult': 0.6},
+    ('S6', 'BULLISH_MOMENTUM'): {'amount_mult': 1.3, 'max_mult': 1.2, 'tp_mult': 1.3, 'sl_mult': 0.8},
+    ('S6', 'BEARISH_MOMENTUM'): {'amount_mult': 0.4, 'max_mult': 0.6, 'tp_mult': 0.7, 'sl_mult': 1.4},
+    
+    # ========== S7 (Overheated) - 리스크 축소 ==========
+    ('S7', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.2, 'tp_mult': 0.4, 'sl_mult': 2.5},
+    ('S7', 'STRONG_RESISTANCE'): {'amount_mult': 0.2, 'max_mult': 0.3, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    ('S7', 'NEAR_RESISTANCE'): {'amount_mult': 0.4, 'max_mult': 0.5, 'tp_mult': 0.7, 'sl_mult': 1.5},
+    ('S7', 'NEUTRAL'): {'amount_mult': 0.6, 'max_mult': 0.7, 'tp_mult': 0.9, 'sl_mult': 1.2},
+    ('S7', 'NEAR_SUPPORT'): {'amount_mult': 0.8, 'max_mult': 0.9, 'tp_mult': 1.0, 'sl_mult': 1.0},
+    ('S7', 'STRONG_SUPPORT'): {'amount_mult': 1.0, 'max_mult': 1.1, 'tp_mult': 1.1, 'sl_mult': 0.9},
+    ('S7', 'EXTREME_OVERSOLD'): {'amount_mult': 1.2, 'max_mult': 1.0, 'tp_mult': 1.2, 'sl_mult': 0.8},
+    ('S7', 'BULLISH_MOMENTUM'): {'amount_mult': 0.5, 'max_mult': 0.6, 'tp_mult': 0.8, 'sl_mult': 1.3},
+    ('S7', 'BEARISH_MOMENTUM'): {'amount_mult': 0.3, 'max_mult': 0.4, 'tp_mult': 0.6, 'sl_mult': 1.8},
+    
+    # ========== S8 (Distribution) - 최소 활동 ==========
+    ('S8', 'EXTREME_OVERBOUGHT'): {'amount_mult': 0.0, 'max_mult': 0.1, 'tp_mult': 0.3, 'sl_mult': 3.0},
+    ('S8', 'STRONG_RESISTANCE'): {'amount_mult': 0.1, 'max_mult': 0.2, 'tp_mult': 0.4, 'sl_mult': 2.5},
+    ('S8', 'NEAR_RESISTANCE'): {'amount_mult': 0.2, 'max_mult': 0.3, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    ('S8', 'NEUTRAL'): {'amount_mult': 0.3, 'max_mult': 0.4, 'tp_mult': 0.7, 'sl_mult': 1.5},
+    ('S8', 'NEAR_SUPPORT'): {'amount_mult': 0.4, 'max_mult': 0.5, 'tp_mult': 0.8, 'sl_mult': 1.2},
+    ('S8', 'STRONG_SUPPORT'): {'amount_mult': 0.5, 'max_mult': 0.6, 'tp_mult': 0.9, 'sl_mult': 1.0},
+    ('S8', 'EXTREME_OVERSOLD'): {'amount_mult': 0.6, 'max_mult': 0.7, 'tp_mult': 1.0, 'sl_mult': 0.8},
+    ('S8', 'BULLISH_MOMENTUM'): {'amount_mult': 0.4, 'max_mult': 0.5, 'tp_mult': 0.8, 'sl_mult': 1.3},
+    ('S8', 'BEARISH_MOMENTUM'): {'amount_mult': 0.2, 'max_mult': 0.3, 'tp_mult': 0.5, 'sl_mult': 2.0},
+    
+    # ========== 기본값 ==========
     ('DEFAULT', 'DEFAULT'): {'amount_mult': 0.5, 'max_mult': 0.5, 'tp_mult': 1.0, 'sl_mult': 1.0},
 }
 

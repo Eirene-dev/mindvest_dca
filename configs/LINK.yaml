@@ -1,7 +1,7 @@
 symbol: LINK
 price_precision: 1
 volume_precision: 0
-open_amount: 80
+open_amount: 240
 max_amount: 2400
 direction: LONG
 take_profit_ratio: 3

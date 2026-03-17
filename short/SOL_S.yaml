@@ -1,0 +1,9 @@
+symbol: SOL
+price_precision: 3
+volume_precision: 2
+open_amount: 20
+max_amount: 1000
+direction: SHORT
+take_profit_ratio: 0.8
+stop_loss_ratio: -30
+is_lao: false

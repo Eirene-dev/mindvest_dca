@@ -1,8 +1,8 @@
 symbol: BTC
 price_precision: 1
 volume_precision: 3
-open_amount: 300
-max_amount: 6000
+open_amount: 600
+max_amount: 8000
 direction: LONG
 take_profit_ratio: 5
 stop_loss_ratio: -50

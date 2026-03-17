@@ -1,7 +1,7 @@
 symbol: AVAX
 price_precision: 3
 volume_precision: 0
-open_amount: 30
+open_amount: 120
 max_amount: 3000
 direction: LONG
 take_profit_ratio: 1

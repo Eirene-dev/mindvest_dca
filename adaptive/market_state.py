@@ -337,21 +337,22 @@ class MarketStateManager:
                 self.current_sentiment = self.map_sentiment_from_rsi_breadth(rsi, breadth)
             
             # 2. AI 분석 데이터 가져오기
-            ai_data = self.db.get_latest_ai_analysis()
-            if ai_data:
-                # overall_signal을 우리 포맷으로 변환
-                signal_map = {
-                    'STRONG_BUY': 'STRONG_BUY',
-                    'BUY': 'BUY',
-                    'NEUTRAL': 'NEUTRAL',
-                    'SELL': 'SELL',
-                    'STRONG_SELL': 'STRONG_SELL'
-                }
-                raw_signal = ai_data.get('overall_signal', 'NEUTRAL').upper()
-                self.current_ai_signal = signal_map.get(raw_signal, 'NEUTRAL')
-            else:
-                # AI 데이터가 없으면 기본값
-                self.current_ai_signal = 'NEUTRAL'
+            self.current_ai_signal = 'NEUTRAL'
+            # ai_data = self.db.get_latest_ai_analysis()
+            # if ai_data:
+            #     # overall_signal을 우리 포맷으로 변환
+            #     signal_map = {
+            #         'STRONG_BUY': 'STRONG_BUY',
+            #         'BUY': 'BUY',
+            #         'NEUTRAL': 'NEUTRAL',
+            #         'SELL': 'SELL',
+            #         'STRONG_SELL': 'STRONG_SELL'
+            #     }
+            #     raw_signal = ai_data.get('overall_signal', 'NEUTRAL').upper()
+            #     self.current_ai_signal = signal_map.get(raw_signal, 'NEUTRAL')
+            # else:
+            #     # AI 데이터가 없으면 기본값
+            #     self.current_ai_signal = 'NEUTRAL'
             
             # 3. MarketRegime 결정
             self.last_regime = self.current_regime

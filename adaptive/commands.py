@@ -34,45 +34,6 @@ class Commands:
         )
 
     # =========================
-    # Status & Analysis
-    # =========================
-    # async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    #     sm = self.s.state_manager
-    #     params = sm.get_strategy_params()
-
-    #     symbols = ", ".join(html.escape(s) for s in params["allowed_symbols"])
-
-    #     output = (
-    #         "<b>System Status</b>\n"
-    #         f"{SEP}\n"
-    #         f"🔹 Market State: <code>{html.escape(sm.current_state)}</code>\n"
-    #         f"🔹 Description: {html.escape(params['description'])}\n"
-    #         f"🔹 Confidence: {sm.state_confidence:.1%}\n"
-    #         f"🔹 Active Symbols: {symbols}\n"
-    #         f"\n<b>Trading Status</b>\n"
-    #     )
-
-    #     active_count = sum(1 for _, cfg in self.s.trade_config.trade_config.items() if not cfg.stop_trade)
-    #     stopped_count = sum(1 for _, cfg in self.s.trade_config.trade_config.items() if cfg.stop_trade)
-
-    #     output += f"• Active: <b>{active_count}</b> symbols\n"
-    #     output += f"• Stopped: <b>{stopped_count}</b> symbols\n"
-
-    #     await self._send_html(update, output)
-
-    # async def market_state(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    #     await self.s.state_manager.update_state()
-    #     params = self.s.state_manager.get_strategy_params()
-    #     output = (
-    #         "<b>Current Market State</b>\n"
-    #         f"{SEP}\n"
-    #         f"• State: <code>{html.escape(self.s.state_manager.current_state)}</code>\n"
-    #         f"• Description: {html.escape(params['description'])}\n"
-    #         f"• Confidence: {self.s.state_manager.state_confidence:.1%}\n"
-    #         f"• Last Update: {html.escape(self.s.state_manager.last_update_time.strftime('%Y-%m-%d %H:%M:%S'))}\n"
-    #     )
-    #     await self._send_html(update, output)
-    # =========================
     # Status & Analysis (Updated)
     # =========================
     async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

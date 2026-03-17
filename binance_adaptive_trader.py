@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from telegram import ForceReply, Update
 from telegram.ext import filters, CallbackContext, CommandHandler, ApplicationBuilder, ContextTypes, MessageHandler
 from telegram.constants import ParseMode
+from telegram.request import HTTPXRequest
 
 # Plotting
 import matplotlib
@@ -63,7 +64,32 @@ TOTAL_PORTFOLIO_LIMIT = float(os.getenv('TOTAL_PORTFOLIO_LIMIT', '100000'))  # �
 print(f"Total Portfolio Limit: ${TOTAL_PORTFOLIO_LIMIT:,.0f}")
 
 # Telegram Application
-application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+# HTTPXRequest with timeout settings
+request = HTTPXRequest(
+    connect_timeout=20.0,
+    read_timeout=20.0,
+    write_timeout=20.0,
+    pool_timeout=10.0,
+)
+
+# Telegram Application 수정
+application = (
+    ApplicationBuilder()
+    .token(TELEGRAM_BOT_TOKEN)
+    .request(request)
+    .build()
+)
+
+# 간단한 에러 핸들러 추가
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """에러 로깅만 수행"""
+    logger.error(f"Update {update} caused error {context.error}")
+    
+    if isinstance(context.error, telegram.error.NetworkError):
+        logger.info("Network error occurred, bot will auto-retry")
+
+# 에러 핸들러 등록
+application.add_error_handler(error_handler)
 
 # Logger setup
 logger = logging.getLogger('AdaptiveTrader')
@@ -225,8 +251,17 @@ class AdaptiveSymbolInfo(SymbolInfo):
         
         if matrix_key in POSITION_ADJUSTMENT_MATRIX:
             adjustments = POSITION_ADJUSTMENT_MATRIX[matrix_key]
+        elif ('DEFAULT', 'DEFAULT') in POSITION_ADJUSTMENT_MATRIX:
+            adjustments = POSITION_ADJUSTMENT_MATRIX[('DEFAULT', 'DEFAULT')]
         else:
-            adjustments = POSITION_ADJUSTMENT_MATRIX['DEFAULT']
+            # 최후의 fallback
+            logger.warning(f"No adjustment found for {matrix_key}, using hardcoded defaults")
+            adjustments = {
+                'amount_mult': 1.0,
+                'max_mult': 1.0,
+                'tp_mult': 1.0,
+                'sl_mult': 1.0,
+            }
         
         # 4. 최종 파라미터 계산
         self.open_amount = base_amount * adjustments['amount_mult']

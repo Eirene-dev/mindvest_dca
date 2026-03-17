@@ -1,7 +1,7 @@
 symbol: ADA
 price_precision: 4
 volume_precision: 0
-open_amount: 60
+open_amount: 240
 max_amount: 3600
 direction: LONG
 take_profit_ratio: 4

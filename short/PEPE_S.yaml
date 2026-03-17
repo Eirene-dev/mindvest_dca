@@ -1,0 +1,9 @@
+symbol: 1000PEPE
+price_precision: 7
+volume_precision: 0
+open_amount: 20
+max_amount: 1000
+direction: SHORT
+take_profit_ratio: 1.5
+stop_loss_ratio: -30
+is_lao: false

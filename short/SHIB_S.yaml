@@ -1,0 +1,9 @@
+symbol: 1000SHIB
+price_precision: 6
+volume_precision: 0
+open_amount: 20
+max_amount: 1000
+direction: SHORT
+take_profit_ratio: 3
+stop_loss_ratio: -30
+is_lao: false

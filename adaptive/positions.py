@@ -226,41 +226,82 @@ Loss Amount: ${loss_amount:,.2f}
         pos = self.position_amt['LONG']
         entry_price = self.entry_price['LONG']
 
+        self.logger.info(f"[VA] {self.symbol_config.symbol} OpenAmount: {self.symbol_config.open_amount}, Target Amount: {self.va_target_amount}")
+        self.logger.info(f"Target Amount: {self.va_target_amount}")
+
         current_asset_value = pos * price
         if pos <= 0:
             self.va_target_amount = self.symbol_config.open_amount
+            self.logger.info(f"POS=0, Target Amount: {self.va_target_amount}")
+
         difference = self.va_target_amount - current_asset_value
         profit_ratio = ((price - entry_price) / entry_price) * 100.0 if entry_price > 0 else 0
+        tp_ratio = self.symbol_config.take_profit_ratio
+        sl_ratio = self.symbol_config.stop_loss_ratio
 
-        # 익절/손절
-        if pos > 0 and (profit_ratio >= self.symbol_config.take_profit_ratio or profit_ratio <= self.symbol_config.stop_loss_ratio):
+        self.logger.info(f"Difference: {difference:.0f}")
+
+        # 손절선 회복 시 알림 플래그 해제
+        if self.sl_alert_sent and pos > 0 and profit_ratio > sl_ratio + 2:
+            self.sl_alert_sent = False
+
+        # 익절
+        if pos > 0 and profit_ratio >= tp_ratio:
             OrderManager.sell_market(self.symbol_config, round(price, self.symbol_config.price_precision), round(pos, self.symbol_config.volume_precision))
             self.va_target_amount = self.symbol_config.open_amount
-            action = 'TP' if profit_ratio >= self.symbol_config.take_profit_ratio else 'SL'
-            msg = f'**[{self.symbol_config.symbol}][{action}] VA Close: Profit {profit_ratio:.2f}%'
+            msg = f'**[{self.symbol_config.symbol}][TP] VA Close: Profit {profit_ratio:.2f}%'
             await self.send_message(msg)
-            return
 
+        # 손절 알림 (자동 매도하지 않고 알림만)
+        elif pos > 0 and profit_ratio <= sl_ratio:
+            if not hasattr(self, 'sl_alert_sent') or not self.sl_alert_sent:
+                current_value = pos * price
+                loss_amount = current_value - (pos * entry_price)
+                msg = f"""
+    🚨 **STOP LOSS ALERT** 🚨
+    ━━━━━━━━━━━━━━━━
+    Symbol: {self.symbol_config.symbol} (VA)
+    Current Price: ${price:,.2f}
+    Entry Price: ${entry_price:,.2f}
+    Loss: {profit_ratio:.2f}% (Trigger: {sl_ratio:.2f}%)
+    Position Value: ${current_value:,.2f}
+    Loss Amount: ${loss_amount:,.2f}
+    Target Amount: ${self.va_target_amount:,.2f}
+    ━━━━━━━━━━━━━━━━
+    ⚠️ **Manual action required!**
+    /close_position {self.symbol_config.symbol} 또는 /ignore_sl {self.symbol_config.symbol}
+    """
+                await self.send_message(msg)
+                self.sl_alert_sent = True
+                self.logger.warning(f"[{self.symbol_config.symbol}] VA Stop loss triggered but not executed - Alert sent")
+            return  # 손절 상태에서는 추가 매매 중단
+
+        # reduce_only 모드면 추가 매수 안함
         if self.symbol_config.reduce_only:
             return
 
-        # VA 리밸런싱
+        # VA 리밸런싱 (손절 상태가 아닐 때만 실행)
         if difference > 0 and current_asset_value + difference <= self.symbol_config.max_amount:
             buy_volume = round(difference / price, self.symbol_config.volume_precision)
-            if buy_volume > 0 and difference > 100:
+            self.logger.info(f"buy_volume: {buy_volume}")
+            if buy_volume > 0 and abs(difference) > 80:
                 OrderManager.buy_market(self.symbol_config, round(price, self.symbol_config.price_precision), buy_volume)
                 msg = f'[{self.symbol_config.symbol}] VA Buy: ${difference:.0f} at {price}'
                 await self.send_message(msg)
-        elif difference < 0 and difference > 100:
+        elif difference < 0 and abs(difference) > 80:
             sell_volume = round(-difference / price, self.symbol_config.volume_precision)
             sell_volume = min(sell_volume, pos)
+            self.logger.info(f"sell_volume: {sell_volume}")
             if sell_volume > 0:
                 OrderManager.sell_market(self.symbol_config, round(price, self.symbol_config.price_precision), sell_volume)
                 msg = f'[{self.symbol_config.symbol}] VA Sell: ${-difference:.0f} at {price}'
                 await self.send_message(msg)
+        else:
+            self.logger.info(f"difference: {difference:.0f}, current_asset_value: {current_asset_value}, max: {self.symbol_config.max_amount}")
 
-        # 타겟 증가
-        self.va_target_amount *= (1 + self.symbol_config.increase_rate / 100.0)
+        # 타겟 증가 (손절 상태가 아닐 때만)
+        if current_asset_value + difference <= self.symbol_config.max_amount:
+            self.va_target_amount *= (1 + self.symbol_config.increase_rate / 100.0)
 
     async def trade_short_va(self):
         """VA Short (미구현)"""

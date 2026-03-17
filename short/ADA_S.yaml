@@ -1,0 +1,9 @@
+symbol: ADA
+price_precision: 4
+volume_precision: 0
+open_amount: 30
+max_amount: 1000
+direction: SHORT
+take_profit_ratio: 2
+stop_loss_ratio: -30
+is_lao: false
